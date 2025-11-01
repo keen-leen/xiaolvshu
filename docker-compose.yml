@@ -1,0 +1,107 @@
+name: xiaoshiliu
+
+services:
+  # MySQL数据库服务
+  mysql:
+    # 使用官方MySQL镜像
+    image: mysql:8.0
+    container_name: xiaoshiliu-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-123456}
+      MYSQL_DATABASE: ${DB_NAME:-xiaoshiliu}
+      MYSQL_USER: ${DB_USER:-xiaoshiliu_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-123456}
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./express-project/scripts/init-database.sql:/docker-entrypoint-initdb.d/init.sql
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - xiaoshiliu-network
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # 后端API服务
+  backend:
+    build:
+      context: ./express-project
+      dockerfile: Dockerfile
+    container_name: xiaoshiliu-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: mysql
+      DB_USER: ${DB_USER:-xiaoshiliu_user}
+      DB_PASSWORD: ${DB_PASSWORD:-123456}
+      DB_NAME: ${DB_NAME:-xiaoshiliu}
+      DB_PORT: 3306
+      JWT_SECRET: ${JWT_SECRET:-xiaoshiliu_secret_key_2025}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-30d}
+      API_BASE_URL: http://localhost:3001
+      UPLOAD_MAX_SIZE: ${UPLOAD_MAX_SIZE:-50mb}
+      UPLOAD_STRATEGY: ${UPLOAD_STRATEGY:-imagehost}
+      LOCAL_UPLOAD_DIR: ${LOCAL_UPLOAD_DIR:-uploads}
+      LOCAL_BASE_URL: ${LOCAL_BASE_URL:-http://localhost:3001}
+      IMAGEHOST_API_URL: ${IMAGEHOST_API_URL:-https://api.xinyew.cn/api/jdtc}
+      IMAGEHOST_TIMEOUT: ${IMAGEHOST_TIMEOUT:-60000}
+      TZ: Asia/Shanghai
+    ports:
+      - "3001:3001"
+    volumes:
+      - backend_uploads:/app/uploads
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - xiaoshiliu-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 前端Web服务
+  frontend:
+    build:
+      context: ./vue3-project
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:3001/api
+    container_name: xiaoshiliu-frontend
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:80"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - xiaoshiliu-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mysql_data:
+    driver: local
+  backend_uploads:
+    driver: local
+
+networks:
+  xiaoshiliu-network:
+    driver: bridge

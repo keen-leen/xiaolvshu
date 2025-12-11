@@ -52,11 +52,11 @@ export const useCommentStore = defineStore('comment', () => {
                 throw new Error('响应数据为空')
             }
 
-            if (response.success && response.data && response.data.comments) {
+            if (response.success && response.data && response.data.list) {
                 // 处理顶级评论数据格式
-                const parentComments = response.data.comments.map(comment => ({
+                const parentComments = response.data.list.map(comment => ({
                     id: comment.id,
-                    user_id: comment.user_display_id || comment.user_id, // 小石榴号（用于导航）
+                    user_id: comment.user_display_id || comment.user_id, // 小旅书号（用于导航）
                     user_auto_id: comment.user_auto_id || comment.user_id, // 用户自增ID（用于权限判断）
                     username: comment.nickname || '匿名用户',
                     avatar: comment.user_avatar || new URL('@/assets/imgs/avatar.png', import.meta.url).href,
@@ -76,13 +76,13 @@ export const useCommentStore = defineStore('comment', () => {
                 const fetchAllReplies = async (commentId, allComments = [], allReplies = []) => {
                     try {
                         const repliesResponse = await commentApi.getReplies(commentId)
-                        if (repliesResponse.success && repliesResponse.data && repliesResponse.data.comments) {
-                            const replies = repliesResponse.data.comments.map(reply => {
+                        if (repliesResponse.success && repliesResponse.data && repliesResponse.data.list) {
+                            const replies = repliesResponse.data.list.map(reply => {
                                 // 查找被回复的评论或用户信息
                                 let replyToUsername = '未知用户'
 
                                 // 首先在当前获取的回复中查找
-                                const parentInReplies = repliesResponse.data.comments.find(r => r.id === reply.parent_id)
+                                const parentInReplies = repliesResponse.data.list.find(r => r.id === reply.parent_id)
                                 if (parentInReplies) {
                                     replyToUsername = parentInReplies.nickname || '匿名用户'
                                 } else {
@@ -101,7 +101,7 @@ export const useCommentStore = defineStore('comment', () => {
 
                                 return {
                                     id: reply.id,
-                                    user_id: reply.user_display_id || reply.user_id, // 小石榴号（用于导航）
+                                    user_id: reply.user_display_id || reply.user_id, // 小旅书号（用于导航）
                                     user_auto_id: reply.user_auto_id || reply.user_id, // 用户自增ID（用于权限判断）
                                     username: reply.nickname || '匿名用户',
                                     avatar: reply.user_avatar || new URL('@/assets/imgs/未加载.png', import.meta.url).href,

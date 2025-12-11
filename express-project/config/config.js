@@ -1,5 +1,5 @@
 /**
- * 小石榴校园图文社区 - 应用配置文件
+ * 小旅书旅游交流社区 - 应用配置文件
  * 集中管理所有配置项
  * 
  * @author ZTMYO
@@ -20,7 +20,7 @@ const config = {
 
   // JWT配置
   jwt: {
-    secret: process.env.JWT_SECRET || 'xiaoshiliu_secret_key_2025',
+    secret: process.env.JWT_SECRET || 'xiaolvshu_secret_key_2025',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     refreshExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '30d'
   },

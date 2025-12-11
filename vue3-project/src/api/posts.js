@@ -137,9 +137,10 @@ export async function getPostList(params = {}) {
           }
         }).then(res => res.json())
 
-        if (response && response.code === 200 && response.data && response.data.posts) {
+        const userPostsData = response?.data?.posts || response?.data?.list
+        if (response && response.code === 200 && response.data && userPostsData) {
           return {
-            posts: response.data.posts.map(transformPostData),
+            posts: userPostsData.map(transformPostData),
             pagination: response.data.pagination,
             hasMore: response.data.pagination.page < response.data.pagination.pages
           }
@@ -199,8 +200,10 @@ export async function getPostList(params = {}) {
 
 
 
-    if (response && response.data && response.data.posts) {
-      const transformedPosts = response.data.posts.map(transformPostData)
+    // 支持两种返回格式：posts 或 list
+    const postsData = response?.data?.posts || response?.data?.list
+    if (response && response.data && postsData) {
+      const transformedPosts = postsData.map(transformPostData)
 
       return {
         posts: transformedPosts,

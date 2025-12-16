@@ -34,26 +34,33 @@ public class FollowUserResponse {
      * 个人简介
      */
     private String bio;
+
+    private String location;
+
+    private Integer followCount;
+
+    private Integer fansCount;
+
+    private Integer likeCount;
     
     /**
      * 认证状态
      */
     private Integer verified;
+
+    private LocalDateTime createdAt;
     
     /**
      * 关注时间
      */
     private LocalDateTime followedAt;
+
+    private Integer postCount;
     
     /**
      * 当前用户是否已关注该用户
      */
     private Boolean isFollowing;
-    
-    /**
-     * 该用户是否已关注当前用户
-     */
-    private Boolean isFollowed;
     
     /**
      * 是否互相关注

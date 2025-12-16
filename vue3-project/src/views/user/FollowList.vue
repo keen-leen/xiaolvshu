@@ -95,19 +95,7 @@ async function loadUserList(type) {
     }
 
     if (response.success && response.data) {
-      let users = []
-
-      switch (type) {
-        case 'mutual':
-          users = response.data.mutualFollows || []
-          break
-        case 'following':
-          users = response.data.following || []
-          break
-        case 'followers':
-          users = response.data.followers || []
-          break
-      }
+      let users = response.data.list || []
 
       userLists.value[type] = users.map(user => {
         const transformedUser = {

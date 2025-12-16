@@ -78,6 +78,12 @@ public class User implements Serializable {
      */
     @TableField("like_count")
     private Integer likeCount;
+
+    /**
+     * 帖子数
+     */
+    @TableField("post_count")
+    private Integer postCount;
     
     /**
      * 是否激活

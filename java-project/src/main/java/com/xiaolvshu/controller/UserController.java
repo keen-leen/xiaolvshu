@@ -6,6 +6,7 @@ import com.xiaolvshu.dto.*;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.service.FollowService;
 import com.xiaolvshu.service.UserService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -205,81 +206,39 @@ public class UserController {
      * 获取关注列表
      * GET /users/:id/following?page=1&limit=20
      */
-    @GetMapping("/{userId}/following")
-    public Result<Map<String, Object>> getFollowing(
-            @PathVariable String userId,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit) {
-        log.info("获取关注列表: userId={}, page={}, limit={}", userId, page, limit);
+    @GetMapping("/{username}/following")
+    public Result<PageResult<FollowUserResponse>> getFollowing(@PathVariable String username, PageRequest pageRequest) {
+        log.info("获取关注列表: username={}, page={}, limit={}", username, pageRequest.getPage(), pageRequest.getLimit());
         
-        User targetUser = userService.getUserByUserId(userId);
-        if (targetUser == null) {
-            return Result.notFound("用户不存在");
-        }
+        PageResult<FollowUserResponse> result = followService.getFollowing(username, pageRequest);
         
-        Long currentUserId = UserContext.getUserId();
-        PageResult<FollowUserResponse> result = followService.getFollowing(
-            targetUser.getId(), currentUserId, page, limit);
-        
-        Map<String, Object> data = new HashMap<>();
-        data.put("following", result.getList());
-        data.put("pagination", result.getPagination());
-        
-        return Result.success("获取成功", data);
+        return Result.success("获取成功", result);
     }
     
     /**
      * 获取粉丝列表
      * GET /users/:id/followers?page=1&limit=20
      */
-    @GetMapping("/{userId}/followers")
-    public Result<Map<String, Object>> getFollowers(
-            @PathVariable String userId,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit) {
-        log.info("获取粉丝列表: userId={}, page={}, limit={}", userId, page, limit);
+    @GetMapping("/{username}/followers")
+    public Result<PageResult<FollowUserResponse>> getFollowers(@PathVariable String username, PageRequest pageRequest) {
+        log.info("获取粉丝列表: username={}, page={}, limit={}", username, pageRequest.getPage(), pageRequest.getLimit());
         
-        User targetUser = userService.getUserByUserId(userId);
-        if (targetUser == null) {
-            return Result.notFound("用户不存在");
-        }
+        PageResult<FollowUserResponse> result = followService.getFollowers(username, pageRequest);
         
-        Long currentUserId = UserContext.getUserId();
-        PageResult<FollowUserResponse> result = followService.getFollowers(
-            targetUser.getId(), currentUserId, page, limit);
-        
-        Map<String, Object> data = new HashMap<>();
-        data.put("followers", result.getList());
-        data.put("pagination", result.getPagination());
-        
-        return Result.success("获取成功", data);
+        return Result.success("获取成功", result);
     }
     
     /**
      * 获取互关列表
      * GET /users/:id/mutual-follows?page=1&limit=20
      */
-    @GetMapping("/{userId}/mutual-follows")
-    public Result<Map<String, Object>> getMutualFollows(
-            @PathVariable String userId,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit) {
-        log.info("获取互关列表: userId={}, page={}, limit={}", userId, page, limit);
+    @GetMapping("/{username}/mutual-follows")
+    public Result<PageResult<FollowUserResponse>> getMutualFollows(@PathVariable String username, PageRequest pageRequest) {
+        log.info("获取互关列表: username={}, page={}, limit={}", username, pageRequest.getPage(), pageRequest.getLimit());
         
-        User targetUser = userService.getUserByUserId(userId);
-        if (targetUser == null) {
-            return Result.notFound("用户不存在");
-        }
+        PageResult<FollowUserResponse> result = followService.getMutualFollows(username, pageRequest);
         
-        Long currentUserId = UserContext.getUserId();
-        PageResult<FollowUserResponse> result = followService.getMutualFollows(
-            targetUser.getId(), currentUserId, page, limit);
-        
-        Map<String, Object> data = new HashMap<>();
-        data.put("mutualFollows", result.getList());
-        data.put("pagination", result.getPagination());
-        
-        return Result.success("获取成功", data);
+        return Result.success("获取成功", result);
     }
     
     /**

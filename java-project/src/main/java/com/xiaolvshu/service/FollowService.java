@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xiaolvshu.context.UserContext;
 import com.xiaolvshu.dto.FollowStatusResponse;
 import com.xiaolvshu.dto.FollowUserResponse;
+import com.xiaolvshu.dto.PageRequest;
 import com.xiaolvshu.dto.PageResult;
 import com.xiaolvshu.entity.Follow;
 import com.xiaolvshu.entity.User;
@@ -17,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -138,58 +141,53 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
     /**
      * 获取关注列表
      */
-    public PageResult<FollowUserResponse> getFollowing(Long userId, Long currentUserId, int page, int limit) {
-        Page<Follow> pageParam = new Page<>(page, limit);
-        IPage<Follow> result = followMapper.selectPage(pageParam,
-            new LambdaQueryWrapper<Follow>()
+    public PageResult<FollowUserResponse> getFollowing(String username, PageRequest pageRequest) {
+        User targetUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, username)); // 确保用户存在
+        if (targetUser == null) {
+            throw new BusinessException("用户不存在");             
+        }
+        Long userId = targetUser.getId();
+        Page<Follow> pageParam = new Page<>(pageRequest.getPage(), pageRequest.getLimit());
+        IPage<Follow> result = followMapper.selectPage(pageParam, new LambdaQueryWrapper<Follow>()
                 .eq(Follow::getFollowerId, userId)
                 .orderByDesc(Follow::getCreatedAt)
         );
         
         if (result.getRecords().isEmpty()) {
-            return PageResult.empty(page, limit);
+            return PageResult.empty(pageRequest.getPage(), pageRequest.getLimit());
         }
         
         // 获取关注的用户ID列表
-        List<Long> followingIds = result.getRecords().stream()
-            .map(Follow::getFollowingId)
-            .toList();
+        List<Long> followingIds = result.getRecords().stream().map(Follow::getFollowingId).toList();
         
-        // 获取关注时间映射
-        Map<Long, Follow> followMap = result.getRecords().stream()
-            .collect(Collectors.toMap(Follow::getFollowingId, f -> f));
+        Map<Long, Follow> followMap = result.getRecords().stream().collect(Collectors.toMap(Follow::getFollowingId, f -> f));
         
         // 查询用户信息
         List<User> users = userMapper.selectBatchIds(followingIds);
-        Map<Long, User> userMap = users.stream()
-            .collect(Collectors.toMap(User::getId, u -> u));
-        
-        // 如果有当前用户，查询当前用户的关注状态
+        Map<Long, User> userMap = users.stream().collect(Collectors.toMap(User::getId, u -> u));
+        List<FollowUserResponse> response = new ArrayList<>();
+        Long currentUserId = UserContext.getUserId();
+        // 如果当前用户存在，获取其与关注用户的详细关系
         Set<Long> currentUserFollowingSet = getCurrentUserFollowingSet(currentUserId);
         Set<Long> currentUserFollowerSet = getCurrentUserFollowerSet(currentUserId);
-        
-        // 构建响应
-        List<FollowUserResponse> responses = followingIds.stream()
-            .map(followingId -> {
-                User user = userMap.get(followingId);
-                if (user == null) {
-                    return null;
-                }
-                Follow follow = followMap.get(followingId);
-                return buildFollowUserResponse(user, follow, currentUserId,
-                    currentUserFollowingSet, currentUserFollowerSet);
-            })
-            .filter(r -> r != null)
-            .toList();
-        
-        return new PageResult<>(responses, page, limit, result.getTotal());
+        response = followingIds.stream().map(followingId -> {
+            User user = userMap.get(followingId);
+            Follow follow = followMap.get(followingId);
+            return buildFollowUserResponse(user, follow, currentUserId, currentUserFollowingSet, currentUserFollowerSet);
+        }).toList();
+        return new PageResult<>(response, pageRequest.getPage(), pageRequest.getLimit(), result.getTotal());
     }
     
     /**
      * 获取粉丝列表
      */
-    public PageResult<FollowUserResponse> getFollowers(Long userId, Long currentUserId, int page, int limit) {
-        Page<Follow> pageParam = new Page<>(page, limit);
+    public PageResult<FollowUserResponse> getFollowers(String username, PageRequest pageRequest) {
+        User targetUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, username));
+        if (targetUser == null) {
+            throw new BusinessException("用户不存在");
+        }
+        Long userId = targetUser.getId();
+        Page<Follow> pageParam = new Page<>(pageRequest.getPage(), pageRequest.getLimit());
         IPage<Follow> result = followMapper.selectPage(pageParam,
             new LambdaQueryWrapper<Follow>()
                 .eq(Follow::getFollowingId, userId)
@@ -197,114 +195,81 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
         );
         
         if (result.getRecords().isEmpty()) {
-            return PageResult.empty(page, limit);
+            return PageResult.empty(pageRequest.getPage(), pageRequest.getLimit());
         }
-        
+
         // 获取粉丝的用户ID列表
-        List<Long> followerIds = result.getRecords().stream()
-            .map(Follow::getFollowerId)
-            .toList();
-        
-        // 获取关注时间映射
-        Map<Long, Follow> followMap = result.getRecords().stream()
-            .collect(Collectors.toMap(Follow::getFollowerId, f -> f));
+        List<Long> followerIds = result.getRecords().stream().map(Follow::getFollowerId).toList();
+        Map<Long, Follow> followMap = result.getRecords().stream().collect(Collectors.toMap(Follow::getFollowerId, f -> f));
         
         // 查询用户信息
         List<User> users = userMapper.selectBatchIds(followerIds);
-        Map<Long, User> userMap = users.stream()
-            .collect(Collectors.toMap(User::getId, u -> u));
+        Map<Long, User> userMap = users.stream().collect(Collectors.toMap(User::getId, u -> u));
         
-        // 如果有当前用户，查询当前用户的关注状态
+        List<FollowUserResponse> response = new ArrayList<>();
+        Long currentUserId = UserContext.getUserId();
+        // 如果当前用户存在，获取其与关注用户的详细关系
         Set<Long> currentUserFollowingSet = getCurrentUserFollowingSet(currentUserId);
         Set<Long> currentUserFollowerSet = getCurrentUserFollowerSet(currentUserId);
+        response = followerIds.stream().map(followingId -> {
+            User user = userMap.get(followingId);
+            Follow follow = followMap.get(followingId);
+            return buildFollowUserResponse(user, follow, currentUserId, currentUserFollowingSet, currentUserFollowerSet);
+        }).toList();
         
-        // 构建响应
-        List<FollowUserResponse> responses = followerIds.stream()
-            .map(followerId -> {
-                User user = userMap.get(followerId);
-                if (user == null) {
-                    return null;
-                }
-                Follow follow = followMap.get(followerId);
-                return buildFollowUserResponse(user, follow, currentUserId,
-                    currentUserFollowingSet, currentUserFollowerSet);
-            })
-            .filter(r -> r != null)
-            .toList();
-        
-        return new PageResult<>(responses, page, limit, result.getTotal());
+        return new PageResult<>(response, pageRequest.getPage(), pageRequest.getLimit(), result.getTotal());
     }
     
     /**
      * 获取互关列表
      */
-    public PageResult<FollowUserResponse> getMutualFollows(Long userId, Long currentUserId, int page, int limit) {
+    public PageResult<FollowUserResponse> getMutualFollows(String username, PageRequest pageRequest) {
+        User targetUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, username));
+        if (targetUser == null) {
+            throw new BusinessException("用户不存在");
+        }
+        Long userId = targetUser.getId();
         // 先获取用户关注的人
-        List<Follow> followingList = followMapper.selectList(
-            new LambdaQueryWrapper<Follow>()
-                .eq(Follow::getFollowerId, userId)
-        );
+        List<Follow> followingList = followMapper.selectList(new LambdaQueryWrapper<Follow>().eq(Follow::getFollowerId, userId));
         
         if (followingList.isEmpty()) {
-            return PageResult.empty(page, limit);
+            return PageResult.empty(pageRequest.getPage(), pageRequest.getLimit());
         }
         
-        List<Long> followingIds = followingList.stream()
-            .map(Follow::getFollowingId)
-            .toList();
+        List<Long> followingIds = followingList.stream().map(Follow::getFollowingId).toList();
         
         // 从关注的人中查找也关注了用户的人（互关）
-        Page<Follow> pageParam = new Page<>(page, limit);
-        IPage<Follow> result = followMapper.selectPage(pageParam,
-            new LambdaQueryWrapper<Follow>()
-                .eq(Follow::getFollowingId, userId)
-                .in(Follow::getFollowerId, followingIds)
-                .orderByDesc(Follow::getCreatedAt)
-        );
+        Page<Follow> pageParam = new Page<>(pageRequest.getPage(), pageRequest.getLimit());
+        IPage<Follow> result = followMapper.selectPage(pageParam, new LambdaQueryWrapper<Follow>().eq(Follow::getFollowingId, userId).in(Follow::getFollowerId, followingIds).orderByDesc(Follow::getCreatedAt));
         
         if (result.getRecords().isEmpty()) {
-            return PageResult.empty(page, limit);
+            return PageResult.empty(pageRequest.getPage(), pageRequest.getLimit());
         }
         
         // 获取互关用户的ID列表
-        List<Long> mutualIds = result.getRecords().stream()
-            .map(Follow::getFollowerId)
-            .toList();
+        List<Long> mutualIds = result.getRecords().stream().map(Follow::getFollowerId).toList();
         
-        // 获取关注时间映射
-        Map<Long, Follow> followMap = result.getRecords().stream()
-            .collect(Collectors.toMap(Follow::getFollowerId, f -> f));
+        Map<Long, Follow> followMap = result.getRecords().stream().collect(Collectors.toMap(Follow::getFollowerId, f -> f));
         
         // 查询用户信息
         List<User> users = userMapper.selectBatchIds(mutualIds);
-        Map<Long, User> userMap = users.stream()
-            .collect(Collectors.toMap(User::getId, u -> u));
+        Map<Long, User> userMap = users.stream().collect(Collectors.toMap(User::getId, u -> u));
         
-        // 如果有当前用户，查询当前用户的关注状态
+        List<FollowUserResponse> response = new ArrayList<>();
+        Long currentUserId = UserContext.getUserId();
+        // 如果当前用户存在，获取其与关注用户的详细关系
         Set<Long> currentUserFollowingSet = getCurrentUserFollowingSet(currentUserId);
         Set<Long> currentUserFollowerSet = getCurrentUserFollowerSet(currentUserId);
+        response = mutualIds.stream().map(mutualId -> {
+            User user = userMap.get(mutualId);
+            Follow follow = followMap.get(mutualId);
+            FollowUserResponse followUserResponse = buildFollowUserResponse(user, follow, currentUserId, currentUserFollowingSet, currentUserFollowerSet);
+            followUserResponse.setIsMutual(true);
+            return followUserResponse;
+        }).toList();
         
-        // 构建响应
-        List<FollowUserResponse> responses = mutualIds.stream()
-            .map(mutualId -> {
-                User user = userMap.get(mutualId);
-                if (user == null) {
-                    return null;
-                }
-                Follow follow = followMap.get(mutualId);
-                FollowUserResponse response = buildFollowUserResponse(user, follow, currentUserId,
-                    currentUserFollowingSet, currentUserFollowerSet);
-                // 互关列表中这些用户一定是互关状态
-                response.setIsMutual(true);
-                return response;
-            })
-            .filter(r -> r != null)
-            .toList();
-        
-        return new PageResult<>(responses, page, limit, result.getTotal());
+        return new PageResult<>(response, pageRequest.getPage(), pageRequest.getLimit(), result.getTotal());
     }
-    
-    // ============ 私有辅助方法 ============
     
     /**
      * 获取当前用户关注的用户ID集合
@@ -313,12 +278,7 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
         if (currentUserId == null) {
             return Set.of();
         }
-        return followMapper.selectList(
-            new LambdaQueryWrapper<Follow>()
-                .eq(Follow::getFollowerId, currentUserId)
-        ).stream()
-            .map(Follow::getFollowingId)
-            .collect(Collectors.toSet());
+        return followMapper.selectList(new LambdaQueryWrapper<Follow>().eq(Follow::getFollowerId, currentUserId)).stream().map(Follow::getFollowingId).collect(Collectors.toSet());
     }
     
     /**
@@ -328,12 +288,7 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
         if (currentUserId == null) {
             return Set.of();
         }
-        return followMapper.selectList(
-            new LambdaQueryWrapper<Follow>()
-                .eq(Follow::getFollowingId, currentUserId)
-        ).stream()
-            .map(Follow::getFollowerId)
-            .collect(Collectors.toSet());
+        return followMapper.selectList(new LambdaQueryWrapper<Follow>().eq(Follow::getFollowingId, currentUserId)).stream().map(Follow::getFollowerId).collect(Collectors.toSet());
     }
     
     /**
@@ -347,26 +302,44 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
         response.setNickname(user.getNickname());
         response.setAvatar(user.getAvatar());
         response.setBio(user.getBio());
+        response.setLocation(user.getLocation());
+        response.setFollowCount(user.getFollowCount());
+        response.setFansCount(user.getFansCount());
+        response.setLikeCount(user.getLikeCount());
+        response.setPostCount(user.getPostCount());
         response.setVerified(user.getVerified());
+        response.setCreatedAt(user.getCreatedAt());
         response.setFollowedAt(follow != null ? follow.getCreatedAt() : null);
         
         // 计算关注状态
-        if (currentUserId != null && !currentUserId.equals(user.getId())) {
+        if (currentUserId != null) {
             boolean isFollowing = currentUserFollowingSet.contains(user.getId());
             boolean isFollowed = currentUserFollowerSet.contains(user.getId());
             boolean isMutual = isFollowing && isFollowed;
             
             response.setIsFollowing(isFollowing);
-            response.setIsFollowed(isFollowed);
             response.setIsMutual(isMutual);
             
-            if (isMutual) {
+            if (currentUserId == user.getId()) {
+                // 当前检查的用户就是用户自己（不显示状态）
+                response.setButtonType("self");
+            } else if (isMutual) {
+                // 不是自己且互相关注
                 response.setButtonType("mutual");
             } else if (isFollowing) {
-                response.setButtonType("following");
+                // 不是自己且不是互相关注，但已关注（显示取消关注）
+                response.setButtonType("unfollow");
+            } else if (isFollowed) {
+                // 不是自己也没有互相关注，没有关注，但是被关注（显示回关）
+                response.setButtonType("back");
             } else {
+                // 不是自己且不是互相关注且未关注且未被关注（显示关注）
                 response.setButtonType("follow");
             }
+        } else {
+            response.setIsFollowing(false);
+            response.setIsMutual(false);
+            response.setButtonType("follow");
         }
         
         return response;

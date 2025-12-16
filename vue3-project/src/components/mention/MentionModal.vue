@@ -239,8 +239,8 @@ const loadFriends = async (forceReload = false) => {
 
     // 调用API获取关注的好友列表
     const response = await userApi.getFollowing(currentUserId.value, { limit: 50 })
-    if (response.success && response.data && response.data.following) {
-      friends.value = response.data.following
+    if (response.success && response.data && response.data.list) {
+      friends.value = response.data.list
     } else {
       friends.value = []
     }

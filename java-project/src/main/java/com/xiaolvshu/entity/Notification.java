@@ -80,14 +80,23 @@ public class Notification implements Serializable {
      */
     public static final int TYPE_LIKE_POST = 1;     // 点赞笔记
     public static final int TYPE_LIKE_COMMENT = 2;  // 点赞评论
+    
+    /**
+     * 通知类型：收藏
+     */
+    public static final int TYPE_COLLECT_POST = 3;  // 收藏笔记
+
     /**
      * 通知类型：评论
      */
-    public static final int TYPE_COMMENT = 2;
+    public static final int TYPE_COMMENT_POST = 4;  // 评论笔记
+    public static final int TYPE_REPLY_COMMENT = 5; // 回复评论
+    public static final int TYPE_MENTION_COMMENT = 7; // 评论中@提及
+    public static final int TYPE_MENTION_POST = 8;    // 笔记中@提及
     
     /**
      * 通知类型：关注
      */
-    public static final int TYPE_FOLLOW = 3;
+    public static final int TYPE_FOLLOW_USER = 6;   // 关注用户
 
 }

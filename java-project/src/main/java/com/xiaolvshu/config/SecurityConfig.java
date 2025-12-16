@@ -59,6 +59,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
                 // 用户相关公开接口
                 .requestMatchers(HttpMethod.GET, "/users", "/users/**").permitAll()
+                // 评论相关公开接口
+                .requestMatchers(HttpMethod.GET, "/comments/{commentId}/replies").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

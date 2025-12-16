@@ -11,6 +11,7 @@ import com.xiaolvshu.dto.PostCommentRequest;
 import com.xiaolvshu.dto.PostCommentResponse;
 import com.xiaolvshu.entity.Comment;
 import com.xiaolvshu.entity.Like;
+import com.xiaolvshu.entity.Post;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.mapper.CommentMapper;
 import com.xiaolvshu.mapper.LikeMapper;
@@ -105,6 +106,64 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
         return new PageResult<>(responseList, page, limit, result.getTotal());
     }
     
+    public PageResult<PostCommentResponse> getRepliesByCommentId(Long commentId, PostCommentRequest request) {
+        Integer page = request.getPage();
+        Integer limit = request.getLimit();
+        String sort = request.getSort();
+        
+        // 分页查询子评论（parent_id 为 commentId）
+        Page<Comment> pageParam = new Page<>(page, limit);
+        LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<Comment>()
+                .eq(Comment::getParentId, commentId);
+        
+        // 排序
+        if ("asc".equalsIgnoreCase(sort)) {
+            wrapper.orderByAsc(Comment::getCreatedAt);
+        } else {
+            wrapper.orderByDesc(Comment::getCreatedAt);
+        }
+        
+        IPage<Comment> result = commentMapper.selectPage(pageParam, wrapper);
+        List<Comment> comments = result.getRecords();
+        
+        if (comments.isEmpty()) {
+            return PageResult.empty(page, limit);
+        }
+        
+        // 批量获取用户信息
+        Set<Long> userIds = comments.stream()
+                .map(Comment::getUserId)
+                .collect(Collectors.toSet());
+        Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+        
+        // 批量获取当前用户的点赞状态
+        final Set<Long> likedSet;
+        Long currentUserId = UserContext.getUserId();
+        if (currentUserId != null) {
+            likedSet = likeMapper.selectList(
+                new LambdaQueryWrapper<Like>()
+                    .eq(Like::getUserId, currentUserId)
+                    .eq(Like::getTargetType, Like.TARGET_TYPE_COMMENT)
+                    .in(Like::getTargetId, comments.stream().map(Comment::getId).toList()))
+                .stream()
+                .map(Like::getTargetId)
+                .collect(Collectors.toSet());
+        } else {
+            likedSet = Set.of();
+        }
+        
+        // 转换为响应对象
+        List<PostCommentResponse> responseList = comments.stream()
+                .map(comment -> convertToResponse(
+                        comment,
+                        userMap.get(comment.getUserId()),
+                        0,
+                        likedSet.contains(comment.getId())))
+                .toList();
+        
+        return new PageResult<>(responseList, page, limit, result.getTotal());
+    }
     /**
      * 批量获取子评论数量
      */

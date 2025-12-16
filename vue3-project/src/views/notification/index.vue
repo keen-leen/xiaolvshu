@@ -127,7 +127,7 @@ async function loadCommentsData(isLoadMore = false) {
     }
 
     const response = await getCommentNotifications(params)
-    const notifications = response.data?.notifications || []
+    const notifications = response.data?.list || []
 
     // 批量转换数据，减少单个map操作
     const transformedData = notifications.map(item => {
@@ -207,7 +207,7 @@ async function loadLikesData(isLoadMore = false) {
     const response = await getLikeNotifications(params)
 
     // 转换后端数据格式为前端期望的格式
-    const transformedData = (response.data?.notifications || []).map(item => ({
+    const transformedData = (response.data?.list || []).map(item => ({
       notificationId: item.id, // 通知ID，用于标记已读
       id: item.from_user_id, // 使用from_user_id字段（小石榴号）用于导航
       autoId: item.from_user_auto_id, // 自增ID，用于API调用
@@ -266,7 +266,7 @@ async function loadFollowsData(isLoadMore = false) {
     const response = await getFollowNotifications(params)
 
     // 批量查询关注状态，减少API请求次数
-    const userIds = (response.data?.notifications || []).map(item => item.from_user_id)
+    const userIds = (response.data?.list || []).map(item => item.from_user_id)
     let followStatusMap = new Map()
 
     if (userIds.length > 0) {
@@ -313,7 +313,7 @@ async function loadFollowsData(isLoadMore = false) {
     }
 
     // 转换后端数据格式为前端期望的格式
-    const transformedData = (response.data?.notifications || []).map(item => {
+    const transformedData = (response.data?.list || []).map(item => {
       const userIdForQuery = item.from_user_id
       const followStatus = followStatusMap.get(userIdForQuery) || { followed: false, isMutual: false, buttonType: 'follow' }
 
@@ -393,7 +393,7 @@ async function loadCollectionsData(isLoadMore = false) {
     const response = await getCollectionNotifications(params)
 
     // 转换后端数据格式为前端期望的格式
-    const transformedData = (response.data?.notifications || []).map(item => ({
+    const transformedData = (response.data?.list || []).map(item => ({
       notificationId: item.id, // 通知ID，用于标记已读
       id: item.from_user_id, // 使用from_user_id字段（小石榴号）用于导航
       autoId: item.from_user_auto_id, // 自增ID，用于API调用

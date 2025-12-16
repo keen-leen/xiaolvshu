@@ -29,6 +29,9 @@ public class Result<T> implements Serializable {
     public static <T> Result<T> success(String message, T data) {
         return new Result<>(ResponseCode.SUCCESS, message, data);
     }
+    public static <T> Result<T> success(String message) {
+        return new Result<>(ResponseCode.SUCCESS, message, null);
+    }
     
     public static <T> Result<T> error(String message) {
         return new Result<>(ResponseCode.ERROR, message, null);

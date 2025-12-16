@@ -11,9 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 帖子控制器
- */
 @RestController
 @RequestMapping("/posts")
 @RequiredArgsConstructor
@@ -60,6 +57,7 @@ public class PostController {
         PageResult<PostCommentResponse> comments = commentService.getCommentsByPostId(postId, request);
         return Result.success(comments);
     }
+    
     /**
      * 删除帖子
      */

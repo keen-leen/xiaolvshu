@@ -3,7 +3,6 @@ package com.xiaolvshu.controller;
 import com.xiaolvshu.common.Result;
 import com.xiaolvshu.context.UserContext;
 import com.xiaolvshu.dto.*;
-import com.xiaolvshu.entity.User;
 import com.xiaolvshu.service.FollowService;
 import com.xiaolvshu.service.UserService;
 

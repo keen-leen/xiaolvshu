@@ -184,7 +184,7 @@ router.post('/register', async (req, res) => {
       [userId.toString()]
     );
 
-    console.log(`用户注册成功 - 用户ID: ${userId}, 小石榴号: ${userRows[0].user_id}`);
+    console.log(`用户注册成功 - 用户ID: ${userId}, 小旅书号: ${userRows[0].user_id}`);
 
     res.json({
       code: RESPONSE_CODES.SUCCESS,

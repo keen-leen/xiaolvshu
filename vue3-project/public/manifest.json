@@ -1,6 +1,6 @@
 {
-  "name": "小石榴 - 你的校园图文部落",
-  "short_name": "小石榴",
+  "name": "小旅书 - 驴友旅行交流社区",
+  "short_name": "小旅书",
   "icons": [
     {
       "src": "/android-icon-192x192.png",
@@ -32,5 +32,5 @@
   "display": "standalone",
   "theme_color": "#ff6b6b",
   "background_color": "#ffffff",
-  "description": "小石榴图文社区 - 你的校园图文部落"
+  "description": "小旅书 - 驴友旅行交流社区"
 }

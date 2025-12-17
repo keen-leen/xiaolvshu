@@ -43,7 +43,6 @@ public class UserService extends ServiceImpl<UserMapper, User> {
     
     private final UserMapper userMapper;
     private final PostMapper postMapper;
-    private final FollowMapper followMapper;
     private final LikeMapper likeMapper;
     private final CollectionMapper collectionMapper;
     private final PostImageMapper postImageMapper;

@@ -8,9 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 分类控制器
- */
 @RestController
 @RequestMapping("/categories")
 @RequiredArgsConstructor

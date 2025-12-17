@@ -2,6 +2,8 @@ package com.xiaolvshu.controller;
 
 import com.xiaolvshu.common.Result;
 import com.xiaolvshu.dto.UploadResult;
+import com.xiaolvshu.dto.UploadMultiResult.UploadError;
+import com.xiaolvshu.dto.UploadMultiResult;
 import com.xiaolvshu.service.UploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -53,7 +54,7 @@ public class UploadController {
      * 上传多张图片（最多9张）
      */
     @PostMapping("/multiple")
-    public Result<Map<String, Object>> uploadMultipleImages(@RequestParam("files") MultipartFile[] files) {
+    public Result<UploadMultiResult> uploadMultipleImages(@RequestParam("files") MultipartFile[] files) {
         log.info("上传多张图片，数量: {}", files.length);
         
         if (files.length == 0) {
@@ -61,48 +62,42 @@ public class UploadController {
         }
         
         if (files.length > 9) {
-            return Result.error("文件数量超过限制（9个）");
+            return Result.error("文件数量超过限制(9个)");
         }
         
-        List<Map<String, Object>> uploaded = new ArrayList<>();
-        List<Map<String, String>> errors = new ArrayList<>();
+        List<UploadResult> uploaded = new ArrayList<>();
+        List<UploadError> errors = new ArrayList<>();
         
         for (MultipartFile file : files) {
             // 验证文件
             if (!uploadService.isValidImageFile(file)) {
-                Map<String, String> error = new HashMap<>();
-                error.put("file", file.getOriginalFilename());
-                error.put("error", "只允许上传图片文件");
+                UploadError error = new UploadError();
+                error.setFile(file.getOriginalFilename());
+                error.setError("只允许上传图片文件");
                 errors.add(error);
                 continue;
             }
             
             if (!uploadService.checkImageFileSize(file)) {
-                Map<String, String> error = new HashMap<>();
-                error.put("file", file.getOriginalFilename());
-                error.put("error", "文件大小超过限制（10MB）");
+                UploadError error = new UploadError();
+                error.setFile(file.getOriginalFilename());
+                error.setError("文件大小超过限制(10MB)");
                 errors.add(error);
                 continue;
             }
             
             // 上传图片
             UploadResult result = uploadService.uploadImage(file);
+            uploaded.add(result);
         }
         
         if (uploaded.isEmpty()) {
             return Result.error("所有图片上传失败");
         }
         
-        Map<String, Object> data = new HashMap<>();
-        data.put("uploaded", uploaded);
-        data.put("errors", errors);
-        data.put("total", files.length);
-        data.put("successCount", uploaded.size());
-        data.put("errorCount", errors.size());
+        UploadMultiResult data = new UploadMultiResult(uploaded, errors);
         
-        String message = errors.isEmpty() 
-                ? "所有图片上传成功" 
-                : uploaded.size() + "张上传成功，" + errors.size() + "张失败";
+        String message = errors.isEmpty() ? "所有图片上传成功" : uploaded.size() + "张上传成功，" + errors.size() + "张失败";
         
         log.info("多图片上传完成: {}", message);
         return Result.success(message, data);

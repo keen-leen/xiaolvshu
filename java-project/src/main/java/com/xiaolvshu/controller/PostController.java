@@ -24,9 +24,9 @@ public class PostController {
      * 创建帖子
      */
     @PostMapping
-    public Result<PostResponse> createPost(@Valid @RequestBody CreatePostRequest request, Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        PostResponse post = postService.createPost(userId, request);
+    public Result<PostResponse> createPost(@Valid @RequestBody CreatePostRequest request) {
+        log.info("创建帖子 - 标题: {}, 内容长度: {}, 类型: {}, 是否为草稿: {}", request.getTitle(), request.getContent() != null ? request.getContent().length() : 0, request.getType(), request.isDraft());
+        PostResponse post = postService.createPost(request);
         return Result.success("发布成功", post);
     }
     
@@ -35,6 +35,7 @@ public class PostController {
      */
     @GetMapping
     public Result<PageResult<PostResponse>> getPosts(PostRequest request) {
+        log.info("获取帖子列表 - 分类: {}, 用户ID: {}, 是否草稿: {}, 类型: {}, 页码: {}, 每页: {}, 排序: {}", request.getCategory(), request.getUserId(), request.getIsDraft(), request.getType(), request.getPage(), request.getLimit(), request.getSort());
         PageResult<PostResponse> posts = postService.getPosts(request);
         return Result.success(posts);
     }

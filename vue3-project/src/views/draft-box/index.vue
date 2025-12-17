@@ -168,14 +168,13 @@ const getCategoryName = (categoryId) => {
 const loadDrafts = async () => {
   try {
     loading.value = true
-
     // 检查用户是否已登录
     if (!userStore.userInfo || !userStore.userInfo.user_id) {
       showMessage('请先登录', 'error')
       router.push('/user')
       return
     }
-
+    
     const params = {
       page: currentPage.value,
       limit: 10,
@@ -184,7 +183,7 @@ const loadDrafts = async () => {
       sort: 'created_at',
       user_id: userStore.userInfo.user_id
     }
-
+    
     const response = await getDraftPosts(params)
     if (response.success) {
       drafts.value = response.data.posts

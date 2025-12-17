@@ -1,6 +1,5 @@
 package com.xiaolvshu.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 /**
@@ -8,13 +7,44 @@ import lombok.Data;
  */
 @Data
 public class CreatePostRequest {
+
+    // 帖子标题
+    private String title = "";
     
-    @NotBlank(message = "内容不能为空")
-    private String content;
+    // 帖子内容
+    private String content = "";
     
-    private Long categoryId;
+    // 分类ID
+    private Integer categoryId;
+
+    // 图片URL列表
+    private String[] images;
+
+    // 视频信息
+    private Video video;
     
-    private String postType = "text";
+    // 标签列表
+    private String[] tags;
+
+    // 是否为草稿
+    private boolean isDraft;
     
-    private String location;
+    // 帖子类型（1-图片，2-视频）
+    private Integer type = 1;
+
+    @Data
+    public static class Video {
+        // 视频URL
+        private String url;
+        // 视频封面URL
+        private String coverUrl;
+        // 视频文件名
+        private String filename;
+        // 视频缓冲
+        private byte[] buffer;
+    }
+
+    public void setIs_draft(boolean is_draft) {
+        this.isDraft = is_draft;
+    }
 }

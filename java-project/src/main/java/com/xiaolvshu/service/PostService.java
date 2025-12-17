@@ -8,6 +8,7 @@ import com.xiaolvshu.dto.*;
 import com.xiaolvshu.entity.*;
 import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.*;
+import com.xiaolvshu.utils.MentionParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,9 +22,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 帖子服务
- */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -38,24 +37,140 @@ public class PostService {
     private final TagMapper tagMapper;
     private final LikeMapper likeMapper;
     private final CollectionMapper collectionMapper;
+    private final NotificationMapper notificationMapper;
 
     /**
      * 创建帖子
      */
     @Transactional
-    public PostResponse createPost(Long userId, CreatePostRequest request) {
+    public PostResponse createPost(CreatePostRequest request) {
+        Long userId = UserContext.getUserId();
         User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException("用户不存在");
+        String title = request.getTitle();
+        String content = request.getContent();
+        Integer categoryId = request.getCategoryId();
+        Integer isDraft = request.isDraft() ? 1 : 0;
+        if (isDraft == 0) {
+            if (title == null || title.isBlank() || content == null || content.isBlank()) {
+                throw new BusinessException("发布时标题和内容不能为空");
+            }
         }
-        
+        Integer postType = request.getType();
+        if (postType != 1 && postType != 2) {
+            throw new BusinessException("无效的发布类型");
+        }
+        // 创建笔记
         Post post = new Post();
         post.setUserId(userId);
-        post.setContent(request.getContent());
-        
+        post.setTitle(title);
+        post.setContent(content);
+        post.setCategoryId(categoryId);
+        post.setIsDraft(isDraft);
+        post.setType(postType);
         postMapper.insert(post);
+   
+        Long postId = post.getId();
+        if (postId == null) {
+            throw new BusinessException("帖子创建失败");
+        }
         
-        return convertToResponse(post, null, null, null, null, null);
+        List<String> imageUrls = new ArrayList<>();
+        PostVideo postVideo = null;
+
+        // 处理图片（图文类型）
+        if (postType == 1 && request.getImages() != null && request.getImages().length > 0) {
+            for (String imageUrl : request.getImages()) {
+                if (imageUrl == null || imageUrl.isBlank()) {
+                    continue;
+                }
+                String url = imageUrl.trim();
+                if (url.isEmpty()) {
+                    continue;
+                }
+                PostImage postImage = new PostImage();
+                postImage.setPostId(postId);
+                postImage.setImageUrl(url);
+                postImageMapper.insert(postImage);
+                imageUrls.add(url);
+            }
+        }
+        // 处理视频（视频类型） 
+        else if (postType == 2 && request.getVideo() != null && request.getVideo().getUrl() != null && !request.getVideo().getUrl().isBlank()) {
+            postVideo = new PostVideo();
+            postVideo.setPostId(postId);
+            postVideo.setVideoUrl(request.getVideo().getUrl().trim());
+            if (request.getVideo().getCoverUrl() != null && !request.getVideo().getCoverUrl().isBlank()) {
+                postVideo.setCoverUrl(request.getVideo().getCoverUrl().trim());
+            }
+            postVideoMapper.insert(postVideo);
+        }
+
+        // 处理标签
+        List<TagDTO> tags = new ArrayList<>();
+        if (request.getTags() != null) {
+            for (String rawTagName : request.getTags()) {
+                if (rawTagName == null || rawTagName.isBlank()) {
+                    continue;
+                }
+                String tagName = rawTagName.trim();
+                if (tagName.isEmpty()) {
+                    continue;
+                }
+
+                Tag tag = tagMapper.selectOne(new LambdaQueryWrapper<Tag>().eq(Tag::getName, tagName));
+                if (tag == null) {
+                    tag = new Tag();
+                    tag.setName(tagName);
+                    tag.setUseCount(0);
+                    tagMapper.insert(tag);
+                }
+
+                PostTag postTag = new PostTag();
+                postTag.setPostId(postId);
+                postTag.setTagId(tag.getId());
+                postTagMapper.insert(postTag);
+                // 增加标签使用数
+                tag.setUseCount(tag.getUseCount() + 1);
+                tagMapper.updateById(tag);
+
+                TagDTO dto = new TagDTO();
+                dto.setId(tag.getId());
+                dto.setName(tag.getName());
+                tags.add(dto);
+            }
+        }
+
+        // 处理@用户通知（仅在发布笔记时）
+        if ((isDraft == null || isDraft == 0) && MentionParser.hasMentions(post.getContent())) {
+            List<MentionParser.MentionedUser> mentionedUsers = MentionParser.extractMentionedUsers(post.getContent());
+            for (MentionParser.MentionedUser mentionedUser : mentionedUsers) {
+                if (mentionedUser == null || mentionedUser.getUserId() == null || mentionedUser.getUserId().isBlank()) {
+                    continue;
+                }
+                User mentioned = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, mentionedUser.getUserId()));
+                if (mentioned == null) {
+                    continue;
+                }
+                if (mentioned.getId().equals(userId)) {
+                    continue;
+                }
+                Notification notification = new Notification();
+                notification.setUserId(mentioned.getId());
+                notification.setSenderId(userId);
+                notification.setType(Notification.TYPE_MENTION_POST);
+                notification.setTargetId(post.getId());
+                notification.setIsRead(0);
+                notification.setTitle("在笔记中@了你");
+                notificationMapper.insert(notification);
+            }
+        }
+
+        Category category = null;
+        if (categoryId != null) {
+            category = categoryMapper.selectById(categoryId);
+        }
+        log.info("发布帖子成功, 帖子ID:{},用户ID:{}", post.getId(), userId);
+        return convertToResponse(post, user, category, imageUrls, postVideo, tags);
     }
     
     /**
@@ -67,8 +182,14 @@ public class PostService {
         String category = request.getCategory();
         Integer type = request.getType();
         Integer isDraft = request.getIsDraft();
-        Long userId = request.getUserId();
+        String username = request.getUserId();
         Page<Post> pageParam = new Page<>(page, limit);
+
+        User tarUser = null;
+        if (username != null) {
+            tarUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, username));
+        }
+        Long userId = tarUser != null ? tarUser.getId() : null;
 
         // 暂时将推荐置为全部
         if (category != null && category.equals("recommend")) {
@@ -338,17 +459,14 @@ public class PostService {
     /**
      * 转换为响应对象（简化版）
      */
-    private PostResponse convertToResponse(Post post, User user, Category category,
-                                           List<String> images, PostVideo video, List<TagDTO> tags) {
+    private PostResponse convertToResponse(Post post, User user, Category category, List<String> images, PostVideo video, List<TagDTO> tags) {
         return convertToResponse(post, user, category, images, video, tags, false, false);
     }
     
     /**
      * 转换为响应对象
      */
-    private PostResponse convertToResponse(Post post, User user, Category category,
-                                           List<String> images, PostVideo video, List<TagDTO> tags,
-                                           boolean liked, boolean collected) {
+    private PostResponse convertToResponse(Post post, User user, Category category, List<String> images, PostVideo video, List<TagDTO> tags, boolean liked, boolean collected) {
         PostResponse response = new PostResponse();
         
         // 帖子基本信息

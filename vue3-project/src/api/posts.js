@@ -426,10 +426,8 @@ export async function getDraftPosts(params = {}) {
     })
 
     const response = await request.get('/posts', { params: queryParams })
-
-    if (response.success && response.data && response.data.posts) {
-      const transformedPosts = response.data.posts.map(transformPostData)
-
+    if (response.success && response.data && response.data.list) {
+      const transformedPosts = response.data.list.map(transformPostData)
       return {
         success: true,
         data: {

@@ -97,6 +97,6 @@ public class Notification implements Serializable {
     /**
      * 通知类型：关注
      */
-    public static final int TYPE_FOLLOW_USER = 6;   // 关注用户
+    public static final int TYPE_FOLLOW = 6;   // 关注用户
 
 }

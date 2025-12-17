@@ -10,15 +10,18 @@ import com.xiaolvshu.dto.FollowUserResponse;
 import com.xiaolvshu.dto.PageRequest;
 import com.xiaolvshu.dto.PageResult;
 import com.xiaolvshu.entity.Follow;
+import com.xiaolvshu.entity.Notification;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.FollowMapper;
 import com.xiaolvshu.mapper.UserMapper;
+import com.xiaolvshu.mapper.NotificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,28 +38,28 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
     
     private final FollowMapper followMapper;
     private final UserMapper userMapper;
+    private final NotificationMapper notificationMapper;
     
     /**
      * 关注用户
      */
     @Transactional
-    public void follow(Long followerId, Long followingId) {
+    public void follow(String username) {
+        // 检查目标用户是否存在
+        User targetUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, username));
+        if (targetUser == null) {
+            throw new BusinessException("用户不存在");
+        }
+        Long followerId = UserContext.getUserId();
+        Long followingId = targetUser.getId();
         if (followerId.equals(followingId)) {
             throw new BusinessException("不能关注自己");
         }
         
-        // 检查目标用户是否存在
-        User targetUser = userMapper.selectById(followingId);
-        if (targetUser == null) {
-            throw new BusinessException("用户不存在");
-        }
-        
         // 检查是否已关注
         Long count = followMapper.selectCount(
-            new LambdaQueryWrapper<Follow>()
-                .eq(Follow::getFollowerId, followerId)
-                .eq(Follow::getFollowingId, followingId)
-        );
+            new LambdaQueryWrapper<Follow>().eq(Follow::getFollowerId, followerId)
+                .eq(Follow::getFollowingId, followingId));
         
         if (count > 0) {
             throw new BusinessException("已关注该用户");
@@ -76,29 +79,34 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
         // 更新被关注者的粉丝数
         targetUser.setFansCount(targetUser.getFansCount() + 1);
         userMapper.updateById(targetUser);
+
+        // 发送关注通知
+        Notification notification = new Notification();
+        notification.setUserId(followingId);
+        notification.setType(Notification.TYPE_FOLLOW);
+        notification.setSenderId(followerId);
+        notification.setTitle("有人关注了你");
+        notification.setIsRead(0);
+        notification.setCreatedAt(LocalDateTime.now());
+        notificationMapper.insert(notification);
     }
     
     /**
      * 取消关注
      */
     @Transactional
-    public void unfollow(Long followerId, Long followingId) {
-        if (followerId.equals(followingId)) {
-            throw new BusinessException("不能取消关注自己");
-        }
-        
+    public void unfollow(String username) {
         // 检查目标用户是否存在
-        User targetUser = userMapper.selectById(followingId);
+        User targetUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, username));
         if (targetUser == null) {
             throw new BusinessException("用户不存在");
         }
+        Long followerId = UserContext.getUserId();
+        Long followingId = targetUser.getId();
         
         // 检查是否已关注
-        Follow follow = followMapper.selectOne(
-            new LambdaQueryWrapper<Follow>()
-                .eq(Follow::getFollowerId, followerId)
-                .eq(Follow::getFollowingId, followingId)
-        );
+        Follow follow = followMapper.selectOne(new LambdaQueryWrapper<Follow>().eq(Follow::getFollowerId, followerId)
+                .eq(Follow::getFollowingId, followingId));
         
         if (follow == null) {
             throw new BusinessException("未关注该用户");
@@ -115,15 +123,32 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
         // 更新被关注者的粉丝数
         targetUser.setFansCount(Math.max(0, targetUser.getFansCount() - 1));
         userMapper.updateById(targetUser);
+
+        // 删除未读的关注通知
+        notificationMapper.delete(new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getUserId, followingId)
+                .eq(Notification::getSenderId, followerId)
+                .eq(Notification::getType, Notification.TYPE_FOLLOW)
+                .eq(Notification::getIsRead, 0));
     }
     
     /**
      * 获取关注状态
      */
-    public FollowStatusResponse getFollowStatus(Long currentUserId, Long targetUserId) {
+    public FollowStatusResponse getFollowStatus(String username) {
+        Long currentUserId = UserContext.getUserId();
+        if (currentUserId == null) {
+            return new FollowStatusResponse(false, false, "follow");
+        }
+        // 检查目标用户是否存在
+        User targetUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, username));
+        if (targetUser == null) {
+            throw new BusinessException("用户不存在");
+        }
+        Long targetUserId = targetUser.getId();
+        
         // 当前用户是否关注了目标用户
-        boolean isFollowing = followMapper.selectCount(
-            new LambdaQueryWrapper<Follow>()
+        boolean isFollowing = followMapper.selectCount(new LambdaQueryWrapper<Follow>()
                 .eq(Follow::getFollowerId, currentUserId)
                 .eq(Follow::getFollowingId, targetUserId)
         ) > 0;
@@ -134,8 +159,23 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
                 .eq(Follow::getFollowerId, targetUserId)
                 .eq(Follow::getFollowingId, currentUserId)
         ) > 0;
-        
-        return new FollowStatusResponse(isFollowing, isFollowed);
+
+        boolean isMutual = isFollowing && isFollowed;
+        FollowStatusResponse response = new FollowStatusResponse();
+        response.setIsFollowing(isFollowing);
+        response.setIsFollowed(isFollowed);
+        if (currentUserId.equals(targetUserId)) {
+            response.setButtonType("self");
+        } else if (isMutual) {
+            response.setButtonType("mutual");
+        } else if (isFollowing) {
+            response.setButtonType("unfollow");
+        } else if (isFollowed) {
+            response.setButtonType("back");
+        } else {
+            response.setButtonType("follow");
+        }
+        return response;
     }
     
     /**

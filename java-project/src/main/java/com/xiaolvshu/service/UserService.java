@@ -564,10 +564,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
      * 根据小旅书号获取用户
      */
     public User getUserByUserId(String userId) {
-        return userMapper.selectOne(
-            new LambdaQueryWrapper<User>()
-                .eq(User::getUserId, userId)
-        );
+        return userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, userId));
     }
 }
 

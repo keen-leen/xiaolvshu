@@ -30,17 +30,10 @@ public class FollowStatusResponse {
     
     public FollowStatusResponse() {}
     
-    public FollowStatusResponse(boolean isFollowing, boolean isFollowed) {
+    public FollowStatusResponse(Boolean isFollowing, Boolean isFollowed, String buttonType) {
         this.isFollowing = isFollowing;
         this.isFollowed = isFollowed;
-        this.isMutual = isFollowing && isFollowed;
-        
-        if (this.isMutual) {
-            this.buttonType = "mutual";
-        } else if (isFollowing) {
-            this.buttonType = "following";
-        } else {
-            this.buttonType = "follow";
-        }
+        this.isMutual = isFollowing != null && isFollowed != null && isFollowing && isFollowed;
+        this.buttonType = buttonType;
     }
 }

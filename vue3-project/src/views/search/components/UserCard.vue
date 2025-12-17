@@ -180,7 +180,11 @@ const userHoverConfig = computed(() => ({
         try {
             const followResponse = await followStore.fetchFollowStatus(userId)
             if (followResponse.success) {
-                followStatus = followResponse.data
+                followStatus = {
+                    followed: followResponse.data.is_following,
+                    isMutual: followResponse.data.is_mutual,
+                    buttonType: followResponse.data.button_type
+                }
             } else {
                 // 如果获取失败，尝试从store中获取
                 const storeState = followStore.getUserFollowState(userId)

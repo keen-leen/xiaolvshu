@@ -147,58 +147,39 @@ public class UserController {
     
     /**
      * 关注用户
-     * POST /users/:id/follow
+     * POST /users/:username/follow
      */
-    @PostMapping("/{userId}/follow")
-    public Result<Void> followUser(@PathVariable String userId) {
-        log.info("关注用户: targetUserId={}", userId);
+    @PostMapping("/{username}/follow")
+    public Result<Void> followUser(@PathVariable String username) {
+        log.info("关注用户: targetUsername={}", username);
         
-        Long currentUserId = UserContext.getUserId();
-        User targetUser = userService.getUserByUserId(userId);
-        
-        if (targetUser == null) {
-            return Result.notFound("用户不存在");
-        }
-        
-        followService.follow(currentUserId, targetUser.getId());
-        return Result.success("关注成功", null);
+        followService.follow(username);
+        return Result.success("关注成功");
     }
     
     /**
      * 取消关注
-     * DELETE /users/:id/follow
+     * DELETE /users/:username/follow
      */
-    @DeleteMapping("/{userId}/follow")
-    public Result<Void> unfollowUser(@PathVariable String userId) {
-        log.info("取消关注: targetUserId={}", userId);
+    @DeleteMapping("/{username}/follow")
+    public Result<Void> unfollowUser(@PathVariable String username) {
+        log.info("取消关注: targetUsername={}", username);
         
-        Long currentUserId = UserContext.getUserId();
-        User targetUser = userService.getUserByUserId(userId);
+        userService.getUserByUserId(username);
         
-        if (targetUser == null) {
-            return Result.notFound("用户不存在");
-        }
-        
-        followService.unfollow(currentUserId, targetUser.getId());
+        followService.unfollow(username);
         return Result.success("取消关注成功", null);
     }
     
     /**
      * 获取关注状态
-     * GET /users/:id/follow-status
+     * GET /users/:username/follow-status
      */
-    @GetMapping("/{userId}/follow-status")
-    public Result<FollowStatusResponse> getFollowStatus(@PathVariable String userId) {
-        log.info("获取关注状态: targetUserId={}", userId);
+    @GetMapping("/{username}/follow-status")
+    public Result<FollowStatusResponse> getFollowStatus(@PathVariable String username) {
+        log.info("获取关注状态: targetUsername={}", username);
         
-        Long currentUserId = UserContext.getUserId();
-        User targetUser = userService.getUserByUserId(userId);
-        
-        if (targetUser == null) {
-            return Result.notFound("用户不存在");
-        }
-        
-        FollowStatusResponse status = followService.getFollowStatus(currentUserId, targetUser.getId());
+        FollowStatusResponse status = followService.getFollowStatus(username);
         return Result.success("获取成功", status);
     }
     

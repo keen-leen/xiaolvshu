@@ -216,8 +216,8 @@ function handleUserResults(usersData) {
                 verified: user.verified || 0,
                 followers: user.fans_count || 0,
                 posts: user.post_count || 0,
-                isFollowing: user.isFollowing || false,
-                buttonType: user.buttonType || 'follow',
+                isFollowing: user.is_following || false,
+                buttonType: user.button_type || 'follow',
                 bio: user.bio,
                 location: user.location
             }

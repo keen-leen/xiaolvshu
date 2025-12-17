@@ -182,13 +182,13 @@ const getFollowStatus = async () => {
   try {
     const result = await followStore.fetchFollowStatus(userInfo.value.user_id)
     if (result.success) {
-      followStatus.value = result.data.followed
+      followStatus.value = result.data.is_following
       // 同时初始化 followStore 中的状态
       followStore.initUserFollowState(
         userInfo.value.user_id,
-        result.data.followed,
-        result.data.isMutual || false,
-        result.data.buttonType || 'follow'
+        result.data.is_following,
+        result.data.is_mutual || false,
+        result.data.button_type || 'follow'
       )
     } else {
       // 如果获取失败（比如未登录），默认为未关注状态

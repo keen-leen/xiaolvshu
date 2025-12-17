@@ -280,9 +280,9 @@ async function loadFollowsData(isLoadMore = false) {
               if (followResponse.success) {
                 return { 
                   userId, 
-                  followed: followResponse.data.followed,
-                  isMutual: followResponse.data.isMutual,
-                  buttonType: followResponse.data.buttonType
+                  followed: followResponse.data.is_following,
+                  isMutual: followResponse.data.is_mutual,
+                  buttonType: followResponse.data.button_type
                 }
               } else {
                 // 如果获取失败，尝试从store中获取

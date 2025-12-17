@@ -1652,9 +1652,9 @@ const getCommentUserHoverConfig = (comment) => {
               // 更新store状态
               followStore.initUserFollowState(
                 userId,
-                followStatus.followed,
-                followStatus.isMutual,
-                followStatus.buttonType
+                followStatus.is_following,
+                followStatus.is_mutual,
+                followStatus.button_type
               )
             }
           } catch (error) {
@@ -1713,9 +1713,9 @@ const getCommentUserHoverConfig = (comment) => {
         followCount: userStats.follow_count || 0,
         fansCount: userStats.fans_count || 0,
         likeAndCollectCount: userStats.likes_and_collects || 0,
-        isFollowing: followStatus.followed,
-        isMutual: followStatus.isMutual,
-        buttonType: followStatus.buttonType,
+        isFollowing: followStatus.is_following,
+        isMutual: followStatus.is_mutual,
+        buttonType: followStatus.button_type,
         images: userImages
       }
     },

@@ -141,10 +141,13 @@ export const useFollowStore = defineStore('follow', () => {
     // 初始化用户关注状态
 
     users.forEach(user => {
-      const followed = user.followed || user.isFollowing || false
-      const isMutual = user.isMutual || false
-      const buttonType = user.buttonType || (followed ? 'unfollow' : 'follow')
-      initUserFollowState(user.user_id, followed, isMutual, buttonType)
+      const userId = user.user_id || user.userId
+      const followed = user.is_following || user.isFollowing || user.followed || false
+      const isMutual = user.is_mutual || user.isMutual || false
+      const buttonType = user.button_type || user.buttonType || (followed ? 'unfollow' : 'follow')
+      if (userId) {
+        initUserFollowState(userId, followed, isMutual, buttonType)
+      }
     })
   }
 
@@ -153,9 +156,12 @@ export const useFollowStore = defineStore('follow', () => {
     try {
       const response = await userApi.getFollowStatus(userId)
       if (response.success) {
-        const { followed, isMutual, buttonType } = response.data
+        const data = response.data || {}
+        const followed = data.is_following || data.isFollowing || data.followed || false
+        const isMutual = data.is_mutual || data.isMutual || false
+        const buttonType = data.button_type || data.buttonType || null
         initUserFollowState(userId, followed, isMutual, buttonType)
-        return { success: true, data: response.data }
+        return { success: true, data }
       }
       return { success: false, error: '获取关注状态失败' }
     } catch (error) {

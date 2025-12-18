@@ -90,6 +90,12 @@
             <artifactId>s3</artifactId>
             <version>2.28.24</version>
         </dependency>
+        <!-- 腾讯云对象存储COS -->
+        <dependency>
+            <groupId>com.qcloud</groupId>
+            <artifactId>cos_api</artifactId>
+            <version>5.6.227</version>
+        </dependency>
 
         <!-- Apache Commons -->
         <dependency>

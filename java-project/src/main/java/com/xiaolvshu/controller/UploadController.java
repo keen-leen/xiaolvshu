@@ -5,6 +5,8 @@ import com.xiaolvshu.dto.UploadResult;
 import com.xiaolvshu.dto.UploadMultiResult.UploadError;
 import com.xiaolvshu.dto.UploadMultiResult;
 import com.xiaolvshu.service.UploadService;
+import com.xiaolvshu.utils.CosUtil;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +26,7 @@ import java.util.Map;
 public class UploadController {
 
     private final UploadService uploadService;
+    private final CosUtil cosUtil;
 
     /**
      * 上传单张图片
@@ -46,8 +49,17 @@ public class UploadController {
         }
         
         // 上传图片
-        UploadResult result = uploadService.uploadImage(file);
-        return Result.success(result);
+        try {
+            String url = cosUtil.uploadFile(file, "images");
+            UploadResult result = new UploadResult();
+            result.setOriginalname(file.getOriginalFilename());
+            result.setUrl(url);
+            log.info("图片上传成功: {}", url);
+            return Result.success(result);
+        } catch (Exception e) {
+            log.error("图片上传失败", e);
+            return Result.error("图片上传失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -87,8 +99,19 @@ public class UploadController {
             }
             
             // 上传图片
-            UploadResult result = uploadService.uploadImage(file);
-            uploaded.add(result);
+            try {
+                String url = cosUtil.uploadFile(file, "images");
+                UploadResult result = new UploadResult();
+                result.setOriginalname(file.getOriginalFilename());
+                result.setUrl(url);
+                uploaded.add(result);
+            } catch (Exception e) {
+                log.error("图片上传失败: {}", file.getOriginalFilename(), e);
+                UploadError error = new UploadError();
+                error.setFile(file.getOriginalFilename());
+                error.setError("上传失败: " + e.getMessage());
+                errors.add(error);
+            }
         }
         
         if (uploaded.isEmpty()) {

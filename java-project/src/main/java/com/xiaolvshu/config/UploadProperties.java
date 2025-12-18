@@ -42,7 +42,7 @@ public class UploadProperties {
     
     @Data
     public static class ImageHostConfig {
-        private String apiUrl = "https://api.xinyew.cn/api/jdtc";
+        private String apiUrl = "https://api.xinyew.cn/api/360tc";
         private int timeout = 60000;
     }
     

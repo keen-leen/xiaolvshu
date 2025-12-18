@@ -167,6 +167,7 @@ public class UploadService {
             HttpResponse response = HttpRequest.post(config.getApiUrl())
                     .timeout(config.getTimeout())
                     .form("file", file.getBytes(), file.getOriginalFilename())
+                    .form("business", "image")
                     .execute();
             
             if (!response.isOk()) {
@@ -182,6 +183,9 @@ public class UploadService {
                 result.setOriginalname(resp.getData().getFilename());
                 result.setUrl(resp.getData().getUrl());
                 result.setSize(file.getSize());
+            } else {
+                log.error("图床上传失败: {}", resp.getMessage());
+                throw new RuntimeException("图床上传失败: " + resp.getMessage());
             }
             return result;
         } catch (IOException e) {

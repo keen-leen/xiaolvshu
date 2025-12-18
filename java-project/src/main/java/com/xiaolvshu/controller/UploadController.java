@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -130,9 +131,7 @@ public class UploadController {
      * 上传视频（支持携带缩略图）
      */
     @PostMapping("/video")
-    public Result<Map<String, Object>> uploadVideo(
-            @RequestParam("file") MultipartFile videoFile,
-            @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnailFile) {
+    public Result<Map<String, Object>> uploadVideo(@RequestParam("file") MultipartFile videoFile, @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnailFile) {
         
         log.info("上传视频: {}", videoFile.getOriginalFilename());
         
@@ -148,7 +147,15 @@ public class UploadController {
         if (!uploadService.checkVideoFileSize(videoFile)) {
             return Result.error("文件大小超过限制（100MB）");
         }
-
-        return Result.success("上传成功", null);
+        String url;
+        try {
+            url = cosUtil.uploadFile(videoFile, "videos");
+        } catch (Exception e) {
+            log.error("视频上传失败", e);
+            return Result.error("视频上传失败: " + e.getMessage());
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("url", url);
+        return Result.success("上传成功", result);
     }
 }

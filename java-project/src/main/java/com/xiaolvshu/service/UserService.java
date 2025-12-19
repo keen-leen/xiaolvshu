@@ -534,6 +534,10 @@ public class UserService extends ServiceImpl<UserMapper, User> {
                 if (video != null) {
                     response.setVideoUrl(video.getVideoUrl());
                     response.setCoverUrl(video.getCoverUrl());
+                    response.setImage(video.getCoverUrl());
+                    if (video.getCoverUrl() != null) {
+                        response.getImages().addFirst(video.getCoverUrl());
+                    }
                 }
                 
                 // 标签

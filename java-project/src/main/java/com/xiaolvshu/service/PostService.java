@@ -774,7 +774,7 @@ public class PostService {
             // 图文笔记
             if (images != null && !images.isEmpty()) {
                 response.setImages(images);
-                response.setImage(images.get(0));
+                response.setImage(images.getFirst());
             }
         }
 

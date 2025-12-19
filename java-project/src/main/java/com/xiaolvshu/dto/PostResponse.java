@@ -91,7 +91,7 @@ public class PostResponse {
      * 视频URL（视频笔记）
      */
     private String videoUrl;
-    
+
     /**
      * 视频封面URL（视频笔记）
      */

@@ -1,5 +1,6 @@
 package com.xiaolvshu.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 /**
@@ -35,13 +36,17 @@ public class CreatePostRequest {
     @Data
     public static class Video {
         // 视频URL
+        @JsonProperty("url")
         private String url;
         // 视频封面URL
+        @JsonProperty("coverUrl")
         private String coverUrl;
         // 视频文件名
+        @JsonProperty("name")
         private String filename;
-        // 视频缓冲
-        private byte[] buffer;
+        // 视频文件大小
+        @JsonProperty("size")
+        private Long size;
     }
 
     public void setIs_draft(boolean is_draft) {

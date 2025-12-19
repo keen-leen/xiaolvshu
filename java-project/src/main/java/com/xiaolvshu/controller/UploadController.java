@@ -131,31 +131,46 @@ public class UploadController {
      * 上传视频（支持携带缩略图）
      */
     @PostMapping("/video")
-    public Result<Map<String, Object>> uploadVideo(@RequestParam("file") MultipartFile videoFile, @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnailFile) {
-        
-        log.info("上传视频: {}", videoFile.getOriginalFilename());
+    public Result<UploadResult> uploadVideo(MultipartFile file, MultipartFile thumbnail) {
+        log.info("上传视频: {}, 带缩略图: {}", file.getOriginalFilename(), thumbnail != null ? thumbnail.getOriginalFilename() : "");
         
         // 验证视频文件
-        if (videoFile.isEmpty()) {
-            return Result.error("没有上传视频文件");
+        if (!uploadService.isValidVideoFile(file)) {
+            return Result.error("视频格式不支持");
         }
         
-        if (!uploadService.isValidVideoFile(videoFile)) {
-            return Result.error("只允许上传视频文件");
-        }
-        
-        if (!uploadService.checkVideoFileSize(videoFile)) {
-            return Result.error("文件大小超过限制（100MB）");
+        if (!uploadService.checkVideoFileSize(file)) {
+            return Result.error("文件大小超过限制(100MB)");
         }
         String url;
         try {
-            url = cosUtil.uploadFile(videoFile, "videos");
+            url = cosUtil.uploadFile(file, "videos");
+            log.info("视频上传成功: {}", url);
         } catch (Exception e) {
             log.error("视频上传失败", e);
             return Result.error("视频上传失败: " + e.getMessage());
         }
-        Map<String, Object> result = new HashMap<>();
-        result.put("url", url);
-        return Result.success("上传成功", result);
+        // 如果有缩略图，上传缩略图
+        if (!uploadService.isValidImageFile(thumbnail)) {
+            return Result.error("缩略图格式不支持");
+        }
+        if (!uploadService.checkImageFileSize(thumbnail)) {
+            return Result.error("缩略图大小超过限制(10MB)");
+        }
+        String thumbnailUrl;
+        try {
+            thumbnailUrl = cosUtil.uploadFile(thumbnail, "images");
+            log.info("缩略图上传成功: {}", thumbnailUrl);
+        } catch (Exception e) {
+            log.error("缩略图上传失败", e);
+            return Result.error("缩略图上传失败: " + e.getMessage());
+        }
+        UploadResult result = new UploadResult();
+        result.setOriginalname(file.getOriginalFilename());
+        result.setUrl(url);
+        result.setCoverUrl(thumbnailUrl);
+        result.setSize(file.getSize());
+        
+        return Result.success(result);
     }
 }

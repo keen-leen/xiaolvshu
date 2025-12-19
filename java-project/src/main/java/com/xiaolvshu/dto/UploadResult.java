@@ -1,5 +1,7 @@
 package com.xiaolvshu.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.Data;
 
 /**
@@ -11,6 +13,7 @@ public class UploadResult {
     private Long size;
     private String url;
     private String filePath;
+    @JsonProperty("coverUrl")
     private String coverUrl;
 
     public UploadResult() {

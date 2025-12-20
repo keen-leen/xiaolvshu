@@ -122,13 +122,14 @@ async function searchContent(type = 'all', page = 1, limit = 20) {
                 handlePostResults(postsData)
 
                 if (keyword.value.trim() && !selectedTag.value.trim() && postsData && postsData.data && postsData.data.length > 0) {
-                    // 根据类型分别缓存数据（只有当有数据时才缓存）
+                    // 根据类型分别缓存数据（只有当有数据时才缓存）- 缓存转换后的数据
+                    const transformedData = postsData.data.map(transformPostData)
                     if (type === 'all') {
-                        cachedAllPosts.value = postsData.data
+                        cachedAllPosts.value = transformedData
                     } else if (type === 'posts') {
-                        cachedPostsData.value = postsData.data
+                        cachedPostsData.value = transformedData
                     } else if (type === 'videos') {
-                        cachedVideosData.value = postsData.data
+                        cachedVideosData.value = transformedData
                     }
                     cachedKeyword.value = keyword.value
                 }
@@ -229,9 +230,28 @@ function handleUserResults(usersData) {
     }
 }
 
+// 转换后端数据格式为前端瀑布流需要的格式
+function transformPostData(post) {
+    return {
+        ...post,
+        // 头像：后端返回 user_avatar，前端需要 avatar
+        avatar: post.user_avatar || post.avatar,
+        // 作者昵称：后端返回 nickname，前端需要 author
+        author: post.nickname || post.author || '匿名用户',
+        // 兼容点赞数字段
+        likeCount: post.like_count || post.likeCount || 0,
+        collectCount: post.collect_count || post.collectCount || 0,
+        commentCount: post.comment_count || post.commentCount || 0,
+        // 保留原始字段
+        user_avatar: post.user_avatar,
+        nickname: post.nickname
+    }
+}
+
 function handlePostResults(postsData) {
     if (postsData && postsData.data && postsData.data.length > 0) {
-        postResults.value = postsData.data
+        // 转换每个 post 的字段格式
+        postResults.value = postsData.data.map(transformPostData)
     } else {
         postResults.value = []
         // 如果搜索结果为空，清空对应的缓存

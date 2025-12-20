@@ -15,7 +15,7 @@
                     <div class="user-id">小石榴号：{{ user.userId }}</div>
                     <div class="user-stats">
                         <span class="stat-item">粉丝 · {{ formatNumber(user.followers) }}</span>
-                        <span class="stat-item">笔记 · {{ formatNumber(user.post_count) }}</span>
+                        <span class="stat-item">笔记 · {{ formatNumber(user.posts) }}</span>
                     </div>
                 </div>
                 <FollowButton v-if="!isCurrentUser" :is-following="user.isFollowing" :user-id="user.userId"

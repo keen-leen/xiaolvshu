@@ -55,6 +55,11 @@ public class UserResponse {
      * 获赞数
      */
     private Integer likeCount;
+
+    /**
+     * 笔记数
+     */
+    private Integer postCount;
     
     /**
      * 性别

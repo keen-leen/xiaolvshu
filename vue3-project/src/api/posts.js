@@ -201,7 +201,7 @@ export async function getPostList(params = {}) {
 
 
     // 支持两种返回格式：posts 或 list
-    const postsData = response?.data?.posts || response?.data?.list
+    const postsData = response?.data?.posts || response?.data?.list || response?.data?.data
     if (response && response.data && postsData) {
       const transformedPosts = postsData.map(transformPostData)
 

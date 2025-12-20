@@ -91,12 +91,12 @@ public class PostController {
      * 搜索帖子
      */
     @GetMapping("/search")
-    public Result<PageResult<PostResponse>> searchPosts(PostSearchRequest request, Authentication authentication) {
-        Long currentUserId = null;
-        if (authentication != null) {
-            currentUserId = (Long) authentication.getPrincipal();
+    public Result<PageResult<PostResponse>> searchPosts(PostSearchRequest request) {
+        if (request.getKeyword() == null || request.getKeyword().isBlank()) {
+            return Result.error("请输入搜索关键词");
         }
-        PageResult<PostResponse> posts = postService.searchPosts(request.getKeyword(), request.getPage(), request.getLimit(), currentUserId);
+        log.info("搜索笔记 - 关键词: {}, 页码: {}, 每页: {}", request.getKeyword(), request.getPage(), request.getLimit());
+        PageResult<PostResponse> posts = postService.searchPosts(request.getKeyword(), request.getPage(), request.getLimit());
         return Result.success(posts);
     }
 }

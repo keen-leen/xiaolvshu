@@ -675,18 +675,17 @@ public class PostService {
     /**
      * 搜索帖子
      */
-    public PageResult<PostResponse> searchPosts(String keyword, int page, int limit, Long currentUserId) {
+    public PageResult<PostResponse> searchPosts(String keyword, int page, int limit) {
         Page<Post> pageParam = new Page<>(page, limit);
         IPage<Post> result = postMapper.selectPage(pageParam,
-                new LambdaQueryWrapper<Post>()
-                        .eq(Post::getIsDraft, 0)
-                        .and(wrapper -> wrapper
-                                .like(Post::getTitle, keyword)
-                                .or()
-                                .like(Post::getContent, keyword))
-                        .orderByDesc(Post::getCreatedAt));
+            new LambdaQueryWrapper<Post>()
+                .eq(Post::getIsDraft, 0)
+                .and(wrapper -> wrapper
+                    .like(Post::getTitle, keyword)
+                    .or()
+                    .like(Post::getContent, keyword))
+                .orderByDesc(Post::getCreatedAt));
 
-        // 构建响应（简化处理，实际可以提取公共方法）
         List<Post> posts = result.getRecords();
         if (posts.isEmpty()) {
             return PageResult.empty(page, limit);
@@ -694,32 +693,87 @@ public class PostService {
 
         List<Long> postIds = posts.stream().map(Post::getId).toList();
 
-        // 查找帖子图片
+        // 图片
         Map<Long, List<String>> imageMap = postImageMapper.selectList(
-                new LambdaQueryWrapper<PostImage>()
-                        .in(PostImage::getPostId, postIds))
-                .stream()
-                .collect(Collectors.groupingBy(
-                        PostImage::getPostId,
-                        Collectors.mapping(PostImage::getImageUrl, Collectors.toList())));
+            new LambdaQueryWrapper<PostImage>()
+                .in(PostImage::getPostId, postIds))
+            .stream()
+            .collect(Collectors.groupingBy(
+                PostImage::getPostId,
+                Collectors.mapping(PostImage::getImageUrl, Collectors.toList())));
 
-        // 查找用户信息
+        // 视频封面
+        Map<Long, PostVideo> videoMap = postVideoMapper.selectList(
+            new LambdaQueryWrapper<PostVideo>()
+                .in(PostVideo::getPostId, postIds))
+            .stream()
+            .collect(Collectors.toMap(PostVideo::getPostId, v -> v, (v1, v2) -> v1));
+
+        // 标签
+        List<PostTag> postTags = postTagMapper.selectList(
+            new LambdaQueryWrapper<PostTag>()
+                .in(PostTag::getPostId, postIds));
+        List<Integer> tagIds = postTags.stream().map(PostTag::getTagId).distinct().toList();
+        Map<Integer, Tag> tagMap = tagIds.isEmpty() ? Collections.emptyMap()
+            : tagMapper.selectBatchIds(tagIds).stream()
+                .collect(Collectors.toMap(Tag::getId, t -> t));
+        Map<Long, List<TagDTO>> postTagMap = postTags.stream()
+            .collect(Collectors.groupingBy(
+                PostTag::getPostId,
+                Collectors.mapping(pt -> {
+                    Tag tag = tagMap.get(pt.getTagId());
+                    if (tag != null) {
+                    TagDTO tagDTO = new TagDTO();
+                    tagDTO.setId(tag.getId());
+                    tagDTO.setName(tag.getName());
+                    return tagDTO;
+                    }
+                    return null;
+                }, Collectors.filtering(t -> t != null, Collectors.toList()))));
+
+        // 作者信息
         List<Long> userIds = posts.stream().map(Post::getUserId).distinct().toList();
         Map<Long, User> userMap = userMapper.selectBatchIds(userIds)
+            .stream()
+            .collect(Collectors.toMap(User::getId, user -> user));
+
+        // 点赞与收藏状态（当前用户）
+        final Set<Long> likedSet;
+        final Set<Long> collectedSet;
+        Long uid = UserContext.getUserId();
+        if (uid != null) {
+            likedSet = likeMapper.selectList(
+                new LambdaQueryWrapper<Like>()
+                    .eq(Like::getUserId, uid)
+                    .eq(Like::getTargetType, 1)
+                    .in(Like::getTargetId, postIds))
                 .stream()
-                .collect(Collectors.toMap(User::getId, user -> user));
+                .map(Like::getTargetId)
+                .collect(Collectors.toSet());
+
+            collectedSet = collectionMapper.selectList(
+                new LambdaQueryWrapper<Collection>()
+                    .eq(Collection::getUserId, uid)
+                    .in(Collection::getPostId, postIds))
+                .stream()
+                .map(Collection::getPostId)
+                .collect(Collectors.toSet());
+        } else {
+            likedSet = Collections.emptySet();
+            collectedSet = Collections.emptySet();
+        }
 
         List<PostResponse> postResponses = posts.stream()
-                .map(post -> convertToResponse(
-                        post,
-                        userMap.get(post.getUserId()),
-                        null,
-                        imageMap.get(post.getId()),
-                        null,
-                        null,
-                        false,
-                        false))
-                .toList();
+            .map(post -> convertToResponse(
+                post,
+                userMap.get(post.getUserId()),
+                null,
+                imageMap.get(post.getId()),
+                videoMap.get(post.getId()),
+                postTagMap.get(post.getId()),
+                likedSet.contains(post.getId()),
+                collectedSet.contains(post.getId())))
+            .toList();
 
         return new PageResult<>(postResponses, page, limit, result.getTotal());
     }
@@ -797,5 +851,13 @@ public class PostService {
         response.setCollected(collected);
 
         return response;
+    }
+
+    /**
+     * 搜索接口专用：复用统一的 PostResponse 映射规则
+     */
+    public PostResponse convertToResponseForSearch(Post post, User user, List<String> images,
+            PostVideo video, List<TagDTO> tags, boolean liked, boolean collected) {
+        return convertToResponse(post, user, null, images, video, tags, liked, collected);
     }
 }

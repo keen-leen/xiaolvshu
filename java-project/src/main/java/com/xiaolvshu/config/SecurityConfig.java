@@ -35,6 +35,12 @@ public class SecurityConfig {
     
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
+
+    @Value("${app.cors.allowed-headers}")
+    private String allowedHeaders;
+
+    @Value("${app.cors.allowed-methods}")
+    private String allowedMethods;
     
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -53,8 +59,11 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/health", "/uploads/**").permitAll()
-                .requestMatchers("/categories/**", "/search/**").permitAll()
+                .requestMatchers("/auth/**", "/health").permitAll()
+                // 搜索相关公开接口
+                .requestMatchers(HttpMethod.GET, "/search").permitAll()
+                // 分类相关公开接口
+                .requestMatchers(HttpMethod.GET,"/categories/**").permitAll()
                 // 帖子相关公开接口
                 .requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
                 // 用户相关公开接口
@@ -72,8 +81,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization"));
+        configuration.setAllowedMethods(Arrays.asList(allowedMethods.split(",")));
+        configuration.setAllowedHeaders(Arrays.asList(allowedHeaders.split(",")));
         configuration.setAllowCredentials(true);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

@@ -6,13 +6,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.xiaolvshu.utils.IpLocationUtil;
 import com.xiaolvshu.utils.JwtTokenUtil;
 import com.xiaolvshu.context.UserContext;
+import com.xiaolvshu.dto.AdminAuthResponse;
+import com.xiaolvshu.dto.AdminDTO;
+import com.xiaolvshu.dto.AdminLoginRequest;
 import com.xiaolvshu.dto.AuthResponse;
 import com.xiaolvshu.dto.LoginRequest;
 import com.xiaolvshu.dto.RegisterRequest;
 import com.xiaolvshu.dto.UserDTO;
+import com.xiaolvshu.entity.Admin;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.entity.UserSession;
 import com.xiaolvshu.exception.BusinessException;
+import com.xiaolvshu.mapper.AdminMapper;
 import com.xiaolvshu.mapper.UserMapper;
 import com.xiaolvshu.mapper.UserSessionMapper;
 import com.xiaolvshu.utils.PasswordUtil;
@@ -35,6 +40,7 @@ public class AuthService{
     
     private final UserMapper userMapper;
     private final UserSessionMapper userSessionMapper;
+    private final AdminMapper adminMapper;
     private final JwtTokenUtil jwtTokenUtil;
     private final CaptchaService captchaService;
     
@@ -254,4 +260,52 @@ public class AuthService{
         
         log.info("用户退出成功 - 用户ID: {}", userId);
     }
+    
+    /**
+     * 管理员登录
+     */
+    @Transactional
+    public AdminAuthResponse adminLogin(AdminLoginRequest request) {
+        // 查找管理员
+        Admin admin = adminMapper.selectOne(
+            new LambdaQueryWrapper<Admin>().eq(Admin::getUsername, request.getUsername())
+        );
+        
+        if (admin == null) {
+            throw new BusinessException("管理员账号不存在");
+        }
+        
+        // 验证密码（SHA-256 哈希比较）
+        if (!PasswordUtil.matches(request.getPassword(), admin.getPassword())) {
+            throw new BusinessException("密码错误");
+        }
+        
+        // 生成JWT令牌
+        String accessToken = jwtTokenUtil.generateAccessToken(admin.getId(), admin.getUsername());
+        String refreshToken = jwtTokenUtil.generateRefreshToken(admin.getId(), admin.getUsername());
+        
+        log.info("管理员登录成功 - 管理员ID: {}, 用户名: {}", admin.getId(), admin.getUsername());
+        
+        // 返回结果
+        AdminDTO adminDTO = BeanUtil.copyProperties(admin, AdminDTO.class);
+        AdminAuthResponse.TokensDTO tokens = new AdminAuthResponse.TokensDTO(
+            accessToken,
+            refreshToken,
+            jwtTokenUtil.getExpiresInSeconds()
+        );
+        return new AdminAuthResponse(adminDTO, tokens);
+    }
+    
+    /**
+     * 获取当前管理员信息
+     */
+    public AdminDTO getCurrentAdmin() {
+        Long adminId = UserContext.getUserId();
+        Admin admin = adminMapper.selectById(adminId);
+        if (admin == null) {
+            throw new BusinessException("管理员不存在");
+        }
+        return BeanUtil.copyProperties(admin, AdminDTO.class);
+    }
 }
+

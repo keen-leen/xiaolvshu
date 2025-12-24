@@ -59,7 +59,8 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/health").permitAll()
+                .requestMatchers(HttpMethod.GET,"/auth/**", "/health").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
                 // 搜索相关公开接口
                 .requestMatchers(HttpMethod.GET, "/search").permitAll()
                 // 分类相关公开接口

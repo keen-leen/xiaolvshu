@@ -3,6 +3,7 @@ package com.xiaolvshu.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xiaolvshu.context.UserContext;
 import com.xiaolvshu.dto.*;
 import com.xiaolvshu.dto.CreatePostRequest.Video;
@@ -10,7 +11,6 @@ import com.xiaolvshu.entity.*;
 import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.*;
 import com.xiaolvshu.utils.MentionParser;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -27,10 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
-public class PostService {
+public class PostService extends ServiceImpl<PostMapper, Post> {
 
-    private final PostMapper postMapper;
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
     private final PostImageMapper postImageMapper;
@@ -40,6 +38,22 @@ public class PostService {
     private final LikeMapper likeMapper;
     private final CollectionMapper collectionMapper;
     private final NotificationMapper notificationMapper;
+
+    public PostService(PostMapper postMapper, UserMapper userMapper, CategoryMapper categoryMapper,
+                       PostImageMapper postImageMapper, PostVideoMapper postVideoMapper,
+                       PostTagMapper postTagMapper, TagMapper tagMapper,
+                       LikeMapper likeMapper, CollectionMapper collectionMapper,
+                       NotificationMapper notificationMapper) {
+        this.userMapper = userMapper;
+        this.categoryMapper = categoryMapper;
+        this.postImageMapper = postImageMapper;
+        this.postVideoMapper = postVideoMapper;
+        this.postTagMapper = postTagMapper;
+        this.tagMapper = tagMapper;
+        this.likeMapper = likeMapper;
+        this.collectionMapper = collectionMapper;
+        this.notificationMapper = notificationMapper;
+    }
 
     /**
      * 创建笔记
@@ -69,7 +83,7 @@ public class PostService {
         post.setCategoryId(categoryId);
         post.setIsDraft(isDraft);
         post.setType(postType);
-        postMapper.insert(post);
+        baseMapper.insert(post);
 
         Long postId = post.getId();
         if (postId == null) {
@@ -189,7 +203,7 @@ public class PostService {
     }
 
     public PostResponse updatePost(Long postId, CreatePostRequest request) {
-        Post post = postMapper.selectById(postId);
+        Post post = baseMapper.selectById(postId);
         if (post == null) {
             throw new BusinessException("笔记不存在");
         }
@@ -214,7 +228,7 @@ public class PostService {
         post.setContent(request.getContent() == null ? "" : request.getContent());
         post.setCategoryId(request.getCategoryId());
         post.setIsDraft(isDraft ? 1 : 0);
-        postMapper.updateById(post);
+        baseMapper.updateById(post);
 
         postId = post.getId();
         Integer postType = post.getType();
@@ -451,7 +465,7 @@ public class PostService {
             category = null;
         }
 
-        IPage<Post> result = postMapper.selectPage(pageParam,
+        IPage<Post> result = baseMapper.selectPage(pageParam,
                 new LambdaQueryWrapper<Post>()
                         .eq(category != null, Post::getCategoryId, category)
                         .eq(isDraft != null, Post::getIsDraft, isDraft)
@@ -570,7 +584,7 @@ public class PostService {
      */
     @Transactional
     public PostResponse getPostById(Long id, Boolean skipViewCount) {
-        Post post = postMapper.selectById(id);
+        Post post = baseMapper.selectById(id);
         if (post == null) {
             throw new BusinessException("帖子不存在");
         }
@@ -578,7 +592,7 @@ public class PostService {
         // 增加浏览量（支持跳过）
         if (skipViewCount == null || !skipViewCount) {
             post.setViewCount(post.getViewCount() + 1);
-            postMapper.updateById(post);
+            baseMapper.updateById(post);
         }
 
         // 获取图片
@@ -643,7 +657,7 @@ public class PostService {
      */
     @Transactional
     public void deletePost(Long postId) {
-        Post post = postMapper.selectById(postId);
+        Post post = baseMapper.selectById(postId);
         if (post == null) {
             throw new BusinessException("帖子不存在");
         }
@@ -651,7 +665,7 @@ public class PostService {
         if (!post.getUserId().equals(userId)) {
             throw new BusinessException("无权删除此帖子");
         }
-        postMapper.deleteById(postId);
+        baseMapper.deleteById(postId);
         // 非草稿时更新分类和用户的帖子数
         if (post.getIsDraft() != null && post.getIsDraft() == 0) {
             // 更新分类的帖子数
@@ -677,7 +691,7 @@ public class PostService {
      */
     public PageResult<PostResponse> searchPosts(String keyword, int page, int limit) {
         Page<Post> pageParam = new Page<>(page, limit);
-        IPage<Post> result = postMapper.selectPage(pageParam,
+        IPage<Post> result = baseMapper.selectPage(pageParam,
             new LambdaQueryWrapper<Post>()
                 .eq(Post::getIsDraft, 0)
                 .and(wrapper -> wrapper

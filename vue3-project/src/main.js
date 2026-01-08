@@ -1,11 +1,5 @@
 /**
- * 小石榴校园图文社区 - Vue3前端应用
- * 
- * @author ZTMYO
- * @github https://github.com/ZTMYO
- * @description 基于Vue3+Vite+Pinia的现代化图文社区前端应用
- * @version v1.2.0
- * @license GPLv3
+ * 小旅书旅游交流社区 - 基于Vue3+Vite+Pinia的前端应用
  */
 
 import { createApp } from 'vue'

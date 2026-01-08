@@ -50,6 +50,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
     private final PostTagMapper postTagMapper;
     private final TagMapper tagMapper;
     private final CategoryMapper categoryMapper;
+    private final AuditMapper auditMapper;
     
     /**
      * 搜索用户
@@ -568,6 +569,114 @@ public class UserService extends ServiceImpl<UserMapper, User> {
      */
     public User getUserByUserId(String userId) {
         return userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, userId));
+    }
+    
+    // ============ 认证申请相关方法 ============
+    
+    /**
+     * 提交认证申请
+     *
+     * @param request 认证申请请求
+     * @return 审核ID
+     */
+    @Transactional
+    public Long submitVerification(VerificationRequest request) {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new BusinessException("请先登录");
+        }
+        
+        // 验证认证类型
+        if (request.getType() != 1 && request.getType() != 2) {
+            throw new BusinessException("无效的认证类型");
+        }
+        
+        // 检查是否已有待审核的认证申请
+        com.xiaolvshu.entity.Audit existingAudit = auditMapper.selectOne(
+                new LambdaQueryWrapper<com.xiaolvshu.entity.Audit>()
+                        .eq(com.xiaolvshu.entity.Audit::getUserId, userId)
+                        .eq(com.xiaolvshu.entity.Audit::getType, request.getType())
+                        .eq(com.xiaolvshu.entity.Audit::getStatus, com.xiaolvshu.entity.Audit.STATUS_PENDING));
+        
+        if (existingAudit != null) {
+            throw new BusinessException("您已有相同类型的认证申请正在审核中，请耐心等待");
+        }
+        
+        // 创建审核记录
+        com.xiaolvshu.entity.Audit audit = new com.xiaolvshu.entity.Audit();
+        audit.setUserId(userId);
+        audit.setType(request.getType());
+        audit.setContent(request.getContent());
+        audit.setStatus(com.xiaolvshu.entity.Audit.STATUS_PENDING);
+        auditMapper.insert(audit);
+        
+        return audit.getId();
+    }
+    
+    /**
+     * 获取用户认证状态
+     *
+     * @return 认证状态列表
+     */
+    public List<VerificationStatusResponse> getVerificationStatus() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new BusinessException("请先登录");
+        }
+        
+        List<com.xiaolvshu.entity.Audit> audits = auditMapper.selectList(
+                new LambdaQueryWrapper<com.xiaolvshu.entity.Audit>()
+                        .eq(com.xiaolvshu.entity.Audit::getUserId, userId)
+                        .orderByDesc(com.xiaolvshu.entity.Audit::getCreatedAt));
+        
+        return audits.stream().map(audit -> {
+            VerificationStatusResponse response = new VerificationStatusResponse();
+            response.setId(audit.getId());
+            response.setType(audit.getType());
+            response.setStatus(audit.getStatus());
+            response.setCreatedAt(audit.getCreatedAt());
+            response.setAuditTime(audit.getAuditTime());
+            return response;
+        }).toList();
+    }
+    
+    /**
+     * 撤回认证申请
+     */
+    @Transactional
+    public void revokeVerification() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new BusinessException("请先登录");
+        }
+        
+        // 查找用户的认证申请（包括待审核、已通过和已拒绝的）
+        List<com.xiaolvshu.entity.Audit> audits = auditMapper.selectList(
+                new LambdaQueryWrapper<com.xiaolvshu.entity.Audit>()
+                        .eq(com.xiaolvshu.entity.Audit::getUserId, userId)
+                        .in(com.xiaolvshu.entity.Audit::getStatus, 0, 1, 2));
+        
+        if (audits.isEmpty()) {
+            throw new BusinessException("没有找到可撤回的认证申请");
+        }
+        
+        // 检查是否有已通过的认证
+        boolean hasApproved = audits.stream()
+                .anyMatch(audit -> audit.getStatus() == com.xiaolvshu.entity.Audit.STATUS_APPROVED);
+        
+        // 删除认证申请记录
+        auditMapper.delete(new LambdaQueryWrapper<com.xiaolvshu.entity.Audit>()
+                .eq(com.xiaolvshu.entity.Audit::getUserId, userId)
+                .in(com.xiaolvshu.entity.Audit::getStatus, 0, 1, 2));
+        
+        // 如果撤回的是已通过的认证，需要将用户的verified字段重置为0
+        if (hasApproved) {
+            User user = userMapper.selectById(userId);
+            if (user != null) {
+                user.setVerified(0);
+                userMapper.updateById(user);
+            }
+        }
     }
 }
 

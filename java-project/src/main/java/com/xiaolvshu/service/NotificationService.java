@@ -122,4 +122,21 @@ public class NotificationService extends ServiceImpl<NotificationMapper, Notific
                 .eq(Notification::getIsRead, 0)
                 .set(Notification::getIsRead, 1));
     }
+    
+    /**
+     * 删除通知
+     *
+     * @param id 通知ID
+     */
+    public void deleteNotification(Long id) {
+        Long userId = UserContext.getUserId();
+        // 验证通知是否属于当前用户
+        boolean removed = this.remove(new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getId, id)
+                .eq(Notification::getUserId, userId));
+        
+        if (!removed) {
+            throw new BusinessException("通知不存在");
+        }
+    }
 }

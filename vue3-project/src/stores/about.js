@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 /**
  * 关于模态框状态管理
- * 集中管理关于小石榴模态框的显示状态
+ * 集中管理关于小旅书模态框的显示状态
  */
 export const useAboutStore = defineStore('about', () => {
   // 模态框显示状态

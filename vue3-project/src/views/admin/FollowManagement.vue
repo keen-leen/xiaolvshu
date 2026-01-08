@@ -9,10 +9,10 @@ import CrudTable from '@/views/admin/components/CrudTable.vue'
 const columns = [
   { key: 'id', label: 'ID', sortable: true },
   { key: 'follower_id', label: '关注者ID', sortable: false },
-  { key: 'follower_display_id', label: '关注者小石榴号', type: 'user-link', sortable: false },
+  { key: 'follower_display_id', label: '关注者小旅书号', type: 'user-link', sortable: false },
   { key: 'follower_nickname', label: '关注者昵称', sortable: false },
   { key: 'following_id', label: '被关注者ID', sortable: false },
-  { key: 'following_display_id', label: '被关注者小石榴号', type: 'user-link', sortable: false },
+  { key: 'following_display_id', label: '被关注者小旅书号', type: 'user-link', sortable: false },
   { key: 'following_nickname', label: '被关注者昵称', sortable: false },
   { key: 'created_at', label: '关注时间', type: 'date', sortable: true }
 ]
@@ -23,7 +23,7 @@ const formFields = [
 ]
 
 const searchFields = [
-  { key: 'follower_display_id', label: '关注者小石榴号', placeholder: '搜索关注者小石榴号' },
-  { key: 'following_display_id', label: '被关注者小石榴号', placeholder: '搜索被关注者小石榴号' }
+  { key: 'follower_display_id', label: '关注者小旅书号', placeholder: '搜索关注者小旅书号' },
+  { key: 'following_display_id', label: '被关注者小旅书号', placeholder: '搜索被关注者小旅书号' }
 ]
 </script>

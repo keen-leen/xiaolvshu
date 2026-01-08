@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -272,5 +273,43 @@ public class UserController {
         Long currentUserId = UserContext.getUserId();
         userService.deleteAccount(userId, password, currentUserId);
         return Result.success("账号已删除", null);
+    }
+    
+    /**
+     * 提交认证申请
+     * POST /users/verification
+     */
+    @PostMapping("/verification")
+    public Result<Map<String, Long>> submitVerification(@Valid @RequestBody VerificationRequest request) {
+        log.info("提交认证申请: type={}", request.getType());
+        
+        Long auditId = userService.submitVerification(request);
+        Map<String, Long> data = new HashMap<>();
+        data.put("auditId", auditId);
+        return Result.success("认证申请提交成功，请耐心等待审核", data);
+    }
+    
+    /**
+     * 获取用户认证状态
+     * GET /users/verification/status
+     */
+    @GetMapping("/verification/status")
+    public Result<List<VerificationStatusResponse>> getVerificationStatus() {
+        log.info("获取认证状态");
+        
+        List<VerificationStatusResponse> statuses = userService.getVerificationStatus();
+        return Result.success("获取认证状态成功", statuses);
+    }
+    
+    /**
+     * 撤回认证申请
+     * DELETE /users/verification/revoke
+     */
+    @DeleteMapping("/verification/revoke")
+    public Result<Void> revokeVerification() {
+        log.info("撤回认证申请");
+        
+        userService.revokeVerification();
+        return Result.success("认证申请已撤回", null);
     }
 }

@@ -2,13 +2,13 @@ package com.xiaolvshu.controller;
 
 import com.xiaolvshu.common.Result;
 import com.xiaolvshu.dto.*;
+import com.xiaolvshu.service.CollectionService;
 import com.xiaolvshu.service.CommentService;
 import com.xiaolvshu.service.PostService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,6 +19,7 @@ public class PostController {
     
     private final PostService postService;
     private final CommentService commentService;
+    private final CollectionService collectionService;
     
     /**
      * 创建笔记
@@ -98,5 +99,17 @@ public class PostController {
         log.info("搜索笔记 - 关键词: {}, 页码: {}, 每页: {}", request.getKeyword(), request.getPage(), request.getLimit());
         PageResult<PostResponse> posts = postService.searchPosts(request.getKeyword(), request.getPage(), request.getLimit());
         return Result.success(posts);
+    }
+    
+    /**
+     * 收藏/取消收藏笔记
+     * POST /posts/{id}/collect
+     */
+    @PostMapping("/{id}/collect")
+    public Result<CollectResponse> collectPost(@PathVariable Long id) {
+        log.info("收藏/取消收藏笔记 - 笔记ID: {}", id);
+        CollectResponse response = collectionService.toggleCollect(id);
+        String message = response.isCollected() ? "收藏成功" : "取消收藏成功";
+        return Result.success(message, response);
     }
 }

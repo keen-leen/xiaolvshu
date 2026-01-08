@@ -29,7 +29,7 @@ onMounted(() => {
 const columns = [
   { key: 'id', label: 'ID', type: 'post-link', sortable: true },
   { key: 'title', label: '标题', type: 'content', sortable: false },
-  { key: 'user_display_id', label: '小石榴号', type: 'user-link', sortable: false },
+  { key: 'user_display_id', label: '小旅书号', type: 'user-link', sortable: false },
   { key: 'category', label: '分类', sortable: false },
   { key: 'type', label: '类型', type: 'mapped', map: { 1: '图文', 2: '视频' }, sortable: false },
   { key: 'is_draft', label: '草稿', sortable: false, type: 'boolean', trueText: '是', falseText: '否' },
@@ -114,6 +114,6 @@ const searchFields = computed(() => [
       { value: '1', label: '草稿' }
     ]
   },
-  { key: 'user_display_id', label: '作者小石榴号', placeholder: '搜索作者小石榴号' }
+  { key: 'user_display_id', label: '作者小旅书号', placeholder: '搜索作者小旅书号' }
 ])
 </script>

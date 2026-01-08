@@ -774,7 +774,7 @@ function closeDetailCard() {
 function onUserClick(userId, event) {
     event.stopPropagation() // 阻止事件冒泡，避免触发卡片点击
     if (userId) {
-        // 使用小石榴号作为用户页面路径参数
+        // 使用小旅书号作为用户页面路径参数
         const userUrl = `${window.location.origin}/user/${userId}`
         window.open(userUrl, '_blank')
     }

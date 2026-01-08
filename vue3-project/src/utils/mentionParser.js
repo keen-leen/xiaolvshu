@@ -56,7 +56,7 @@ export function parseMentions(text) {
   const mentionRegex = /\[@([^:]+):([^\]]+)\]/g
 
   let result = escapedText.replace(mentionRegex, (match, nickname, userId) => {
-    // 生成用户主页链接，使用小石榴号作为路由参数
+    // 生成用户主页链接，使用小旅书号作为路由参数
     return `<a href="/user/${userId}" class="mention-link" data-user-id="${userId}" contenteditable="false">@${nickname}</a>`
   })
 

@@ -1,10 +1,15 @@
 /**
- * 小石榴校园图文社区 - Vite配置文件
+ * 小旅书旅游交流社区 - Vite配置文件
  * 
+ * 原作者信息
  * @author ZTMYO
  * @github https://github.com/ZTMYO
  * @description Vue3项目的Vite构建配置
  * @version v1.2.0
+ * 
+ * 修改者信息
+ * @author KeenLi
+ * @github 
  */
 
 import { fileURLToPath, URL } from 'node:url'

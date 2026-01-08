@@ -92,4 +92,14 @@ public class NotificationController {
         notificationService.markAllAsRead();
         return Result.success("全部标记成功");
     }
+    
+    /**
+     * 删除通知
+     * DELETE /notifications/:id
+     */
+    @DeleteMapping("/{id}")
+    public Result<Void> deleteNotification(@PathVariable Long id) {
+        notificationService.deleteNotification(id);
+        return Result.success("删除成功");
+    }
 }

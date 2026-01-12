@@ -1,4 +1,4 @@
--- 小石榴图文社区数据库初始化脚本
+-- 小旅书旅游交流社区数据库初始化脚本
 -- 创建数据库（如果不存在）
 CREATE DATABASE IF NOT EXISTS `xiaolvshu` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `xiaolvshu`;
@@ -7,7 +7,7 @@ USE `xiaolvshu`;
 CREATE TABLE IF NOT EXISTS `users` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '用户ID',
   `password` varchar(255) DEFAULT NULL COMMENT '密码',
-  `user_id` varchar(50) NOT NULL COMMENT '小石榴号',
+  `user_id` varchar(50) NOT NULL COMMENT '小旅书号',
   `nickname` varchar(100) NOT NULL COMMENT '昵称',
   `avatar` varchar(500) DEFAULT NULL COMMENT '头像URL',
   `bio` text DEFAULT NULL COMMENT '个人简介',
@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `follow_count` int(11) DEFAULT 0 COMMENT '关注数',
   `fans_count` int(11) DEFAULT 0 COMMENT '粉丝数',
   `like_count` int(11) DEFAULT 0 COMMENT '获赞数',
+  `post_count` int DEFAULT 0 COMMENT '发布笔记数',
   `is_active` tinyint(1) DEFAULT 1 COMMENT '是否激活',
   `last_login_at` timestamp NULL DEFAULT NULL COMMENT '最后登录时间',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -48,6 +49,7 @@ CREATE TABLE categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE COMMENT '分类名称',
     category_title VARCHAR(50) NULL COMMENT '分类英文标题，用于URL路径',
+    post_count BIGINT DEFAULT 0 COMMENT '该分类下的笔记数量',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     UNIQUE KEY uk_category_title (category_title)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分类表';

@@ -5,11 +5,11 @@
       <div class="about-header">
         <div class="header-content">
           <div class="logo-section">
-            <div class="about-logo"><img :src="logoUrl" alt="小石榴" /></div>
+            <div class="about-logo"><img :src="logoUrl" alt="小旅书" /></div>
 
-            <h2 class="about-title">关于小石榴</h2>
+            <h2 class="about-title">关于小旅书</h2>
           </div>
-          <p class="version">v1.2.0</p>
+          <p class="version">v2.1.0</p>
         </div>
         <button class="close-btn" @click="closeModal">
           <SvgIcon name="close" />
@@ -21,7 +21,8 @@
           <div class="intro-section">
             <h3>项目简介</h3>
             <p>
-              小石榴校园图文社区是一个面向开发者与学习者的开源示例项目，旨在提供从前端到后端的完整实践范本，帮助大家学习现代 Web 应用的架构设计、工程化与业务实现。
+              小旅书是一款专为广大驴友打造的旅游交流社区，在这里可以分享旅行见闻、查找旅游攻略、探索世界的每一个角落。
+              注：本项目为开源学习项目，仅供学习交流使用，不得用于商业用途。项目来源于“小石榴”，并对其后端进行了Java重构，对前端做了相应修改，以及增加了一些功能。
             </p>
           </div>
           <div class="author-section">
@@ -31,16 +32,25 @@
                 <img class="author-avatar" :src="ztmyoUrl" alt="ZTMYO">
                 <div class="author-details">
                   <p class="author-name">@ZTMYO</p>
-                  <p class="author-desc">全栈开发者</p>
+                  <p class="author-desc">前端开发者</p>
+                </div>
+              </div>
+            </a>
+            <a href="https://github.com/leayqeay" target="_blank" class="author-link">
+              <div class="author-info">
+                <img class="author-avatar" :src="keenUrl" alt="Keen">
+                <div class="author-details">
+                  <p class="author-name">@Keen</p>
+                  <p class="author-desc">后端开发者</p>
                 </div>
               </div>
             </a>
           </div>
-          <div class="features-section">
-            <h3>项目亮点</h3>
+          <!-- <div class="features-section">
+            <h3>项目架构</h3>
             <ul class="features-list">
               <li><strong>前端：</strong>Vue 3+Vite+Pinia+Vue Router</li>
-              <li><strong>后端：</strong>Node.js/Express+MySQL</li>
+              <li><strong>后端：</strong>SpringBoot3 + MySQL8.0</li>
               <li><strong>工程化：</strong>环境配置、代码规范、构建与产物优化的完整流程</li>
               <li><strong>业务能力：</strong>鉴权流程、路由守卫、状态管理与接口封装</li>
               <li><strong>体验优化：</strong>骨架屏、懒加载、预加载、无障碍与响应式适配</li>
@@ -48,42 +58,16 @@
               <li><strong>后台管理：</strong>基础CRUD、数据管理与配置面板，支持后续扩展权限与统计</li>
               <li><strong>第三方库：</strong>VueUse、Cropper.js、vue3-emoji-picker、svg-captcha等的集成与实践</li>
             </ul>
-          </div>
-
-          <div class="api-section">
-            <h3>接口服务</h3>
-            <div class="api-content">
-              <p>
-                <strong>图片存储：</strong>灌装的示例图片来自 <a href="https://t.alcy.cc/" target="_blank" class="api-link"><img
-                    :src="liciUrl" alt="栗次元" class="api-icon">栗次元图床</a>，提供稳定的图片存储服务。
-              </p>
-              <p>
-                <strong>图片上传：</strong>用户上传图片使用了 <a href="https://api.aa1.cn/doc/xinyew_jdtc.html" target="_blank"
-                  class="api-link"><img :src="xiaRouUrl" alt="夏柔" class="api-icon">夏柔API</a>，确保图片上传的稳定性和速度。
-              </p>
-              <p>
-                <strong>属地查询：</strong>IP属地查询服务使用 <a href="https://api.pearktrue.cn/dashboard/detail/290" target="_blank"
-                  class="api-link"><img :src="baoLuoUrl" alt="保罗" class="api-icon">保罗API</a>，实现精准的IP属地定位功能。
-              </p>
-            </div>
-          </div>
-
-
+          </div> -->
 
           <div class="privacy-section">
             <h3>隐私声明</h3>
             <div class="privacy-content">
               <p>
-                <strong>数据保护：</strong>我们承诺不收集或存储用户的IP地址信息，保护用户的隐私和匿名性。
-              </p>
-              <p>
                 <strong>密码安全：</strong>用户密码采用SHA256加密算法进行哈希处理，确保密码信息的安全性，系统无法获取用户的明文密码。
               </p>
               <p>
                 <strong>数据最小化：</strong>我们仅收集必要的用户信息用于基本功能实现，不会收集与服务无关的个人数据。
-              </p>
-              <p>
-                <strong>本地存储：</strong>所有用户数据均存储在本地数据库中，不会上传至第三方服务器或云端。
               </p>
             </div>
           </div>
@@ -91,6 +75,9 @@
           <div class="copyright-section">
             <h3>版权声明</h3>
             <div class="copyright-content">
+              <p>
+                <strong>以下声明来源于原项目</strong>
+              </p>
               <p>
                 <strong>设计灵感：</strong>本校园图文社区的UI设计和交互体验参考了小红书平台，旨在为下载该开源项目的人员提供一个熟悉的项目体验。
               </p>
@@ -104,7 +91,7 @@
           </div>
 
           <div class="about-footer">
-            <p>&copy; 2025 小石榴校园图文社区. Made with ❤️ by @ZTMYO</p>
+            <p>&copy; 2025 小旅书旅行交流社区. Made with ❤️ by @Keen</p>
           </div>
         </div>
       </div>
@@ -122,8 +109,9 @@ const emit = defineEmits(['close'])
 const { lock, unlock } = useScrollLock()
 
 // 静态资源URL
-const logoUrl = new URL('@/assets/imgs/小石榴.png', import.meta.url).href
+const logoUrl = new URL('@/assets/imgs/logo.png', import.meta.url).href
 const ztmyoUrl = new URL('@/assets/imgs/ztmyo.png', import.meta.url).href
+const keenUrl = new URL('@/assets/imgs/keen.png', import.meta.url).href
 const liciUrl = new URL('@/assets/imgs/栗次元.ico', import.meta.url).href
 const xiaRouUrl = new URL('@/assets/imgs/夏柔.ico', import.meta.url).href
 const baoLuoUrl = new URL('@/assets/imgs/保罗.ico', import.meta.url).href

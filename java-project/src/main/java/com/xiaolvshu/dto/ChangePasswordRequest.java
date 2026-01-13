@@ -1,5 +1,6 @@
 package com.xiaolvshu.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import jakarta.validation.constraints.NotBlank;
@@ -15,6 +16,7 @@ public class ChangePasswordRequest {
      * 当前密码
      */
     @NotBlank(message = "当前密码不能为空")
+    @JsonProperty("currentPassword")
     private String currentPassword;
     
     /**
@@ -22,5 +24,6 @@ public class ChangePasswordRequest {
      */
     @NotBlank(message = "新密码不能为空")
     @Size(min = 6, message = "新密码长度不能少于6位")
+    @JsonProperty("newPassword")
     private String newPassword;
 }

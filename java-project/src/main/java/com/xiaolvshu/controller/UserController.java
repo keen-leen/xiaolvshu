@@ -250,9 +250,7 @@ public class UserController {
      * PUT /users/:id/password
      */
     @PutMapping("/{userId}/password")
-    public Result<Void> changePassword(
-            @PathVariable String userId,
-            @Valid @RequestBody ChangePasswordRequest request) {
+    public Result<Void> changePassword(@PathVariable String userId, @Valid @RequestBody ChangePasswordRequest request) {
         log.info("修改密码: userId={}", userId);
         
         Long currentUserId = UserContext.getUserId();

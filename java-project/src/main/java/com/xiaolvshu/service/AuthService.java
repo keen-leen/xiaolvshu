@@ -71,7 +71,7 @@ public class AuthService{
         user.setNickname(request.getNickname());
         // 使用 SHA-256 哈希密码
         user.setPassword(PasswordUtil.sha256(request.getPassword()));
-        user.setAvatar("https://img20.360buyimg.com/openfeedback/jfs/t1/349561/26/2288/51193/68c324e1F0847c3c5/21f0e026204657da.png");
+        user.setAvatar("https://xiaolvshu-1310922207.cos.ap-beijing.myqcloud.com/images/avatar.png");
         user.setBio(request.getBio());
         
         String ip = IpLocationUtil.getClientIp(httpRequest);

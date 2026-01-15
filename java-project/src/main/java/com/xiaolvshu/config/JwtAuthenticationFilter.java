@@ -1,6 +1,5 @@
 package com.xiaolvshu.config;
 
-import com.xiaolvshu.context.UserContext;
 import com.xiaolvshu.utils.JwtTokenUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -37,25 +36,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 验证JWT并设置用户信息到ThreadLocal
             if (StringUtils.hasText(jwt) && jwtTokenUtil.validateToken(jwt)) {
                 Long userId = jwtTokenUtil.getUserIdFromToken(jwt);
-                String username = jwtTokenUtil.getUsernameFromToken(jwt);
-                
-                // 设置到ThreadLocal
-                UserContext.setUserId(userId);
-                UserContext.setUsername(username);
-                
+                // String username = jwtTokenUtil.getUsernameFromToken(jwt);
+
                 // 设置Spring Security认证信息
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
+            filterChain.doFilter(request, response);
         } catch (Exception ex) {
             log.error("无法设置用户认证信息", ex);
-        }
-        
-        try {
-            filterChain.doFilter(request, response);
-        } finally {
-            // 清理ThreadLocal，防止内存泄漏
-            UserContext.clear();
         }
     }
     

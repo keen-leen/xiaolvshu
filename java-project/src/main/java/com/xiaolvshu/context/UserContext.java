@@ -1,46 +1,48 @@
 package com.xiaolvshu.context;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 /**
- * 用户上下文 - 使用ThreadLocal存储当前登录用户信息
+ * 用户上下文工具类
+ * 提供统一的方式获取当前登录用户的信息
+ * 底层使用 Spring Security 的 SecurityContextHolder
  */
 public class UserContext {
     
-    private static final ThreadLocal<Long> USER_ID = new ThreadLocal<>();
-    private static final ThreadLocal<String> USERNAME = new ThreadLocal<>();
-    
     /**
-     * 设置当前用户ID
-     */
-    public static void setUserId(Long userId) {
-        USER_ID.set(userId);
-    }
-    
-    /**
-     * 获取当前用户ID
+     * 获取当前登录用户的ID
+     * 
+     * @return 用户ID，如果未登录则返回null
      */
     public static Long getUserId() {
-        return USER_ID.get();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Long) {
+            return (Long) authentication.getPrincipal();
+        }
+        return null;
     }
     
     /**
-     * 设置当前用户名
+     * 获取当前登录用户的ID（非空版本）
+     * 
+     * @return 用户ID
+     * @throws IllegalStateException 如果用户未登录
      */
-    public static void setUsername(String username) {
-        USERNAME.set(username);
+    public static Long requireUserId() {
+        Long userId = getUserId();
+        if (userId == null) {
+            throw new IllegalStateException("用户未登录");
+        }
+        return userId;
     }
     
     /**
-     * 获取当前用户名
+     * 判断当前用户是否已登录
+     * 
+     * @return 是否已登录
      */
-    public static String getUsername() {
-        return USERNAME.get();
-    }
-    
-    /**
-     * 清除当前用户信息
-     */
-    public static void clear() {
-        USER_ID.remove();
-        USERNAME.remove();
+    public static boolean isAuthenticated() {
+        return getUserId() != null;
     }
 }

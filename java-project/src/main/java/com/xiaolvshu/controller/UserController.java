@@ -9,6 +9,7 @@ import com.xiaolvshu.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -263,9 +264,7 @@ public class UserController {
      * DELETE /users/:id
      */
     @DeleteMapping("/{userId}")
-    public Result<Void> deleteAccount(
-            @PathVariable String userId,
-            @RequestParam String password) {
+    public Result<Void> deleteAccount(@PathVariable String userId, @RequestParam String password) {
         log.info("删除账号: userId={}", userId);
         
         Long currentUserId = UserContext.getUserId();

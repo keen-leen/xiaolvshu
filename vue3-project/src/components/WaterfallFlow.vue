@@ -669,7 +669,7 @@ const loadImageDirectly = (imgElement, src) => {
         imgElement.style.opacity = '1'
         imgElement.style.visibility = 'visible'
         imgElement.dispatchEvent(new Event('load'))
-    }, 5000)
+    }, 10000)
 
     img.onload = () => {
         clearTimeout(timeout)

@@ -112,9 +112,6 @@ const { lock, unlock } = useScrollLock()
 const logoUrl = new URL('@/assets/imgs/logo.png', import.meta.url).href
 const ztmyoUrl = new URL('@/assets/imgs/ztmyo.png', import.meta.url).href
 const keenUrl = new URL('@/assets/imgs/keen.png', import.meta.url).href
-const liciUrl = new URL('@/assets/imgs/栗次元.ico', import.meta.url).href
-const xiaRouUrl = new URL('@/assets/imgs/夏柔.ico', import.meta.url).href
-const baoLuoUrl = new URL('@/assets/imgs/保罗.ico', import.meta.url).href
 
 const isAnimating = ref(false)
 

@@ -39,7 +39,7 @@ public class CosUtil {
     @Value("${cos.secret-key:}")
     private String secretKey;
 
-    @Value("${cos.region:ap-guangzhou}")
+    @Value("${cos.region:}")
     private String region;
 
     @Value("${cos.bucket-name:}")

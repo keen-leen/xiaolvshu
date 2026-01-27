@@ -588,7 +588,7 @@ const startImageLoadingMonitor = () => {
     // 统一的监控定时器，每15秒检查一次
     imageMonitorTimer.value = setInterval(() => {
         checkImageLoadingStatus()
-    }, 15000)
+    }, 5000)
 }
 
 // 统一的图片加载状态检查
@@ -669,7 +669,7 @@ const loadImageDirectly = (imgElement, src) => {
         imgElement.style.opacity = '1'
         imgElement.style.visibility = 'visible'
         imgElement.dispatchEvent(new Event('load'))
-    }, 10000)
+    }, 30000)
 
     img.onload = () => {
         clearTimeout(timeout)

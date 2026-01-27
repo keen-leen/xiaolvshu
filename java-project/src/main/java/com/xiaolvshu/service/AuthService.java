@@ -24,6 +24,8 @@ import com.xiaolvshu.utils.PasswordUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,8 @@ public class AuthService{
     private final AdminMapper adminMapper;
     private final JwtTokenUtil jwtTokenUtil;
     private final CaptchaService captchaService;
+    private final PasswordEncoder passwordEncoder;
+
     
     /**
      * 用户注册
@@ -69,8 +73,8 @@ public class AuthService{
         User user = new User();
         user.setUserId(request.getUserId());
         user.setNickname(request.getNickname());
-        // 使用 SHA-256 哈希密码
-        user.setPassword(PasswordUtil.sha256(request.getPassword()));
+        // 使用 PasswordEncoder 编码密码
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setAvatar("https://xiaolvshu-1310922207.cos.ap-beijing.myqcloud.com/images/avatar.png");
         user.setBio(request.getBio());
         
@@ -117,8 +121,8 @@ public class AuthService{
             throw new BusinessException("账户已被禁用");
         }
         
-        // 验证密码（SHA-256 哈希比较）
-        if (!PasswordUtil.matches(request.getPassword(), user.getPassword())) {
+        // 验证密码（使用 PasswordEncoder）
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BusinessException("密码错误");
         }
 

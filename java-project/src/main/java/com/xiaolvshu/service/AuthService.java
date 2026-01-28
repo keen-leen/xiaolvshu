@@ -20,7 +20,6 @@ import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.AdminMapper;
 import com.xiaolvshu.mapper.UserMapper;
 import com.xiaolvshu.mapper.UserSessionMapper;
-import com.xiaolvshu.utils.PasswordUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -279,8 +278,8 @@ public class AuthService{
             throw new BusinessException("管理员账号不存在");
         }
         
-        // 验证密码（SHA-256 哈希比较）
-        if (!PasswordUtil.matches(request.getPassword(), admin.getPassword())) {
+        // 验证密码（使用 PasswordEncoder，与用户一致）
+        if (!passwordEncoder.matches(request.getPassword(), admin.getPassword())) {
             throw new BusinessException("密码错误");
         }
         

@@ -8,9 +8,9 @@ import com.xiaolvshu.dto.PageResult;
 import com.xiaolvshu.entity.Admin;
 import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.AdminMapper;
-import com.xiaolvshu.utils.PasswordUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +26,7 @@ import java.util.List;
 public class AdminService extends ServiceImpl<AdminMapper, Admin> {
     
     private final AdminMapper adminMapper;
+    private final PasswordEncoder passwordEncoder;
     
     /**
      * 获取管理员列表（分页）
@@ -88,7 +89,7 @@ public class AdminService extends ServiceImpl<AdminMapper, Admin> {
         // 创建管理员
         Admin admin = new Admin();
         admin.setUsername(username);
-        admin.setPassword(PasswordUtil.sha256(password));
+        admin.setPassword(passwordEncoder.encode(password));
         adminMapper.insert(admin);
         
         log.info("创建管理员成功 - 用户名: {}", username);
@@ -110,7 +111,7 @@ public class AdminService extends ServiceImpl<AdminMapper, Admin> {
         }
         
         // 更新密码
-        admin.setPassword(PasswordUtil.sha256(password));
+        admin.setPassword(passwordEncoder.encode(password));
         adminMapper.updateById(admin);
         
         log.info("更新管理员密码成功 - 用户名: {}", username);
@@ -149,7 +150,7 @@ public class AdminService extends ServiceImpl<AdminMapper, Admin> {
         }
         
         // 更新密码
-        admin.setPassword(PasswordUtil.sha256(password));
+        admin.setPassword(passwordEncoder.encode(password));
         adminMapper.updateById(admin);
         
         log.info("重置管理员密码成功 - ID: {}", id);

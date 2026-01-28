@@ -19,10 +19,9 @@ import com.xiaolvshu.entity.Tag;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.*;
-import com.xiaolvshu.utils.PasswordUtil;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +50,8 @@ public class UserService extends ServiceImpl<UserMapper, User> {
     private final TagMapper tagMapper;
     private final CategoryMapper categoryMapper;
     private final AuditMapper auditMapper;
-    
+    private final PasswordEncoder passwordEncoder;
+
     /**
      * 搜索用户
      */
@@ -332,15 +332,13 @@ public class UserService extends ServiceImpl<UserMapper, User> {
             throw new BusinessException("无权修改他人密码");
         }
         
-        // 验证当前密码
-        String hashedCurrentPassword = PasswordUtil.sha256(request.getCurrentPassword());
-        if (!hashedCurrentPassword.equalsIgnoreCase(user.getPassword())) {
+        // 验证当前密码（使用 PasswordEncoder）
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new BusinessException("当前密码错误");
         }
         
         // 更新密码
-        String hashedNewPassword = PasswordUtil.sha256(request.getNewPassword());
-        user.setPassword(hashedNewPassword);
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userMapper.updateById(user);
     }
     
@@ -359,9 +357,8 @@ public class UserService extends ServiceImpl<UserMapper, User> {
             throw new BusinessException("无权删除他人账号");
         }
         
-        // 验证密码
-        String hashedPassword = PasswordUtil.sha256(password);
-        if (!hashedPassword.equalsIgnoreCase(user.getPassword())) {
+        // 验证密码（使用 PasswordEncoder）
+        if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BusinessException("密码错误");
         }
         

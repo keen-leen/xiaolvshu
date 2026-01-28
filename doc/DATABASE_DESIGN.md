@@ -1,211 +1,259 @@
-# 图文社区项目数据库设计
+# 小旅书图文社区数据库设计
 
 ## 概述
 
-基于小石榴风格的图文社区项目，简化版数据库结构设计，包含用户管理、内容发布、社交互动等核心功能。
+小旅书图文社区项目数据库基于 MySQL 构建。
+- **字符集**: `utf8mb4`
+- **排序规则**: `utf8mb4_unicode_ci`
+- **存储引擎**: `InnoDB`
 
-### 字符集和排序规则
+> **注意**: 本数据库设计主要通过逻辑关系关联表，未设置物理外键约束 (Foreign Key Constraints)。
 
-- 数据库字符集：`utf8mb4`
-- 排序规则：`utf8mb4_unicode_ci`
-- 存储引擎：`InnoDB`
+## 数据表结构详情
 
-## 核心数据表结构
+以下是项目中所有数据表的详细结构定义。
 
-### 1. 用户表 (users)
+### 1. 用户表 (`users`)
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 用户ID | 主键，自增 |
-| password | VARCHAR(255) | 密码 | 可为空 |
-| user_id | VARCHAR(50) | 小石榴号 | 唯一标识 |
-| nickname | VARCHAR(100) | 昵称 | 显示名称 |
-| avatar | VARCHAR(500) | 头像URL | 用户头像 |
-| bio | TEXT | 个人简介 | 用户介绍 |
-| location | VARCHAR(100) | IP属地 | 地理位置 |
-| follow_count | INT | 关注数 | 统计字段，默认0 |
-| fans_count | INT | 粉丝数 | 统计字段，默认0 |
-| like_count | INT | 获赞数 | 统计字段，默认0 |
-| is_active | TINYINT(1) | 是否激活 | 默认1 |
-| last_login_at | TIMESTAMP | 最后登录时间 | 可为空 |
-| created_at | TIMESTAMP | 创建时间 | 注册时间 |
-| updated_at | TIMESTAMP | 更新时间 | 自动更新 |
-| gender | VARCHAR(10) | 性别 | 可为空 |
-| zodiac_sign | VARCHAR(20) | 星座 | 可为空 |
-| mbti | VARCHAR(4) | MBTI人格类型 | 可为空 |
-| education | VARCHAR(50) | 学历 | 可为空 |
-| major | VARCHAR(100) | 专业 | 可为空 |
-| interests | JSON | 兴趣爱好 | JSON数组，可为空 |
-| verified | TINYINT(1) | 认证状态 | 0-未认证，1-已认证，默认0 |
+存储用户的基本信息及统计数据。
 
-### 2. 分类表 (categories)
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 用户ID | **主键**, 自增 |
+| `user_id` | varchar(50) | 是 | 小旅书号 | **唯一索引** (`user_id`) |
+| `password` | varchar(255) | 否 | 密码 | |
+| `nickname` | varchar(100) | 是 | 昵称 | |
+| `avatar` | varchar(500) | 否 | 头像URL | |
+| `bio` | text | 否 | 个人简介 | |
+| `location` | varchar(100) | 否 | IP属地 | |
+| `follow_count` | int(11) | 否 | 关注数 | 默认: 0 |
+| `fans_count` | int(11) | 否 | 粉丝数 | 默认: 0 |
+| `like_count` | int(11) | 否 | 获赞数 | 默认: 0 |
+| `post_count` | int | 否 | 发布笔记数 | 默认: 0 |
+| `is_active` | tinyint(1) | 否 | 是否激活 | 默认: 1 |
+| `last_login_at` | timestamp | 否 | 最后登录时间 | |
+| `created_at` | timestamp | 是 | 创建时间 | 默认: CURRENT_TIMESTAMP, 索引 (`idx_created_at`) |
+| `updated_at` | timestamp | 是 | 更新时间 | 默认: ON UPDATE CURRENT_TIMESTAMP |
+| `gender` | varchar(10) | 否 | 性别 | |
+| `zodiac_sign` | varchar(20) | 否 | 星座 | |
+| `mbti` | varchar(4) | 否 | MBTI人格类型 | |
+| `education` | varchar(50) | 否 | 学历 | |
+| `major` | varchar(100) | 否 | 专业 | |
+| `interests` | json | 否 | 兴趣爱好 | JSON数组 |
+| `verified` | tinyint(1) | 否 | 认证状态 | 0-未认证, 1-已认证, 默认: 0 |
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | INT | 分类ID | 主键，自增 |
-| name | VARCHAR(50) | 分类名称 | 唯一，如：学习、校园、情感等 |
-| category_title | VARCHAR(50) | 分类英文标题 | 唯一，用于URL生成，如：study、campus、emotion等 |
-| created_at | TIMESTAMP | 创建时间 | 分类创建时间 |
+---
 
-**索引：**
-- PRIMARY KEY (`id`)
-- UNIQUE KEY `name` (`name`)
-- UNIQUE KEY `category_title` (`category_title`)
-- KEY `idx_name` (`name`)
-- KEY `idx_category_title` (`category_title`)
+### 2. 管理员表 (`admin`)
 
-**初始数据：**
-- 学习 (study)
-- 校园 (campus)
-- 情感 (emotion)
-- 兴趣 (interest)
-- 生活 (life)
-- 社交 (social)
-- 求助 (help)
-- 观点 (opinion)
-- 毕业 (graduation)
-- 职场 (career)
+存储后台管理人员账户。
 
-### 3. 笔记表 (posts)
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 管理员ID | **主键**, 自增 |
+| `username` | varchar(50) | 是 | 管理员用户名 | **唯一索引** (`username`) |
+| `password` | varchar(255) | 是 | 管理员密码 | |
+| `created_at` | timestamp | 是 | 创建时间 | 默认: CURRENT_TIMESTAMP |
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 笔记ID | 主键，自增 |
-| user_id | BIGINT | 发布用户ID | 外键关联users |
-| title | VARCHAR(200) | 标题 | 笔记标题 |
-| content | TEXT | 内容 | 笔记描述 |
-| category_id | INT | 分类ID | 外键关联categories表，可为空 |
-| type | INT | 笔记类型 | 1-图片笔记，2-视频笔记，默认1 |
-| is_draft | TINYINT(1) | 是否为草稿 | 1-草稿，0-已发布，默认1 |
-| view_count | BIGINT | 浏览量 | 统计字段，默认0 |
-| like_count | INT | 点赞数 | 统计字段，默认0 |
-| collect_count | INT | 收藏数 | 统计字段，默认0 |
-| comment_count | INT | 评论数 | 统计字段，默认0 |
-| created_at | TIMESTAMP | 发布时间 | 创建时间 |
+---
 
-### 3. 笔记图片表 (post_images)
+### 3. 分类表 (`categories`)
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 图片ID | 主键，自增 |
-| post_id | BIGINT | 笔记ID | 外键关联posts |
-| image_url | VARCHAR(500) | 图片URL | 原图地址 |
+笔记的内容分类。
 
-### 4. 笔记视频表 (post_videos)
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | INT | 是 | 分类ID | **主键**, 自增 |
+| `name` | VARCHAR(50) | 是 | 分类名称 | **唯一** |
+| `category_title` | VARCHAR(50) | 否 | 分类英文标题 | **唯一索引** (`uk_category_title`), 用于URL |
+| `post_count` | BIGINT | 否 | 笔记数量 | 默认: 0 |
+| `created_at` | TIMESTAMP | 否 | 创建时间 | 默认: CURRENT_TIMESTAMP |
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 视频ID | 主键，自增 |
-| post_id | BIGINT | 笔记ID | 外键关联posts |
-| cover_url | VARCHAR(500) | 视频封面URL | 视频封面图片，可为空 |
-| video_url | VARCHAR(500) | 视频URL | 视频文件地址 |
+---
 
-### 5. 标签表 (tags)
+### 4. 笔记表 (`posts`)
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | INT | 标签ID | 主键，自增 |
-| name | VARCHAR(50) | 标签名 | 标签内容，唯一 |
-| use_count | INT | 使用次数 | 热度统计，默认0 |
-| created_at | TIMESTAMP | 创建时间 | 首次使用时间 |
+核心内容表，存储笔记的主体信息。
 
-### 6. 笔记标签关联表 (post_tags)
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 笔记ID | **主键**, 自增 |
+| `user_id` | bigint(20) | 是 | 发布用户ID | 索引 (`idx_user_id`) |
+| `title` | varchar(200) | 是 | 标题 | |
+| `content` | text | 是 | 内容 | |
+| `category_id` | int(11) | 否 | 分类ID | 索引 (`idx_category_id`) |
+| `type` | int(11) | 否 | 笔记类型 | 1-图片, 2-视频, 默认: 1 |
+| `view_count` | bigint(20) | 否 | 浏览量 | 默认: 0 |
+| `like_count` | int(11) | 否 | 点赞数 | 默认: 0, 索引 (`idx_like_count`) |
+| `collect_count` | int(11) | 否 | 收藏数 | 默认: 0 |
+| `comment_count` | int(11) | 否 | 评论数 | 默认: 0 |
+| `is_draft` | tinyint(1) | 否 | 是否为草稿 | 1-草稿, 0-发布, 默认: 1 |
+| `created_at` | timestamp | 是 | 发布时间 | 默认: CURRENT_TIMESTAMP, 索引 (`idx_created_at`) |
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 关联ID | 主键，自增 |
-| post_id | BIGINT | 笔记ID | 外键关联posts |
-| tag_id | INT | 标签ID | 外键关联tags |
-| created_at | TIMESTAMP | 创建时间 | 关联时间 |
+---
 
-### 7. 关注关系表 (follows)
+### 5. 笔记图片表 (`post_images`)
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 关注ID | 主键，自增 |
-| follower_id | BIGINT | 关注者ID | 外键关联users |
-| following_id | BIGINT | 被关注者ID | 外键关联users |
-| created_at | TIMESTAMP | 关注时间 | 创建时间 |
+存储图片笔记关联的图片链接。
 
-### 8. 点赞表 (likes)
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 图片ID | **主键**, 自增 |
+| `post_id` | bigint(20) | 是 | 笔记ID | 索引 (`idx_post_id`) |
+| `image_url` | varchar(500) | 是 | 图片URL | |
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 点赞ID | 主键，自增 |
-| user_id | BIGINT | 用户ID | 外键关联users |
-| target_type | TINYINT | 目标类型 | 1-笔记, 2-评论 |
-| target_id | BIGINT | 目标ID | 笔记或评论ID |
-| created_at | TIMESTAMP | 点赞时间 | 创建时间 |
+---
 
-### 9. 收藏表 (collections)
+### 6. 笔记视频表 (`post_videos`)
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 收藏ID | 主键，自增 |
-| user_id | BIGINT | 用户ID | 外键关联users |
-| post_id | BIGINT | 笔记ID | 外键关联posts |
-| created_at | TIMESTAMP | 收藏时间 | 创建时间 |
+存储视频笔记关联的视频及封面链接。
 
-### 10. 评论表 (comments)
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 视频ID | **主键**, 自增 |
+| `post_id` | bigint(20) | 是 | 笔记ID | 索引 (`idx_post_id`) |
+| `cover_url` | varchar(500) | 否 | 视频封面URL | |
+| `video_url` | varchar(500) | 是 | 视频URL | |
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 评论ID | 主键，自增 |
-| post_id | BIGINT | 笔记ID | 外键关联posts |
-| user_id | BIGINT | 评论用户ID | 外键关联users |
-| parent_id | BIGINT | 父评论ID | 回复评论时使用，可为空 |
-| content | TEXT | 评论内容 | 评论文本 |
-| like_count | INT | 点赞数 | 统计字段，默认0 |
-| created_at | TIMESTAMP | 评论时间 | 创建时间 |
+---
 
-### 11. 通知表 (notifications)
+### 7. 标签表 (`tags`)
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 通知ID | 主键，自增 |
-| user_id | BIGINT | 接收用户ID | 外键关联users |
-| sender_id | BIGINT | 发送用户ID | 外键关联users |
-| type | TINYINT | 通知类型 | 1-点赞笔记, 2-点赞评论, 3-收藏, 4-评论笔记, 5-回复评论, 6-关注, 7-评论提及, 8-笔记提及 |
-| title | VARCHAR(200) | 通知标题 | 通知内容 |
-| target_id | BIGINT | 关联目标ID | 笔记或评论ID，可为空 |
-| comment_id | BIGINT | 关联评论ID | 用于评论和回复通知，可为空 |
-| is_read | TINYINT(1) | 是否已读 | 默认0 |
-| created_at | TIMESTAMP | 通知时间 | 创建时间 |
+存储系统中的话题/标签。
 
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | int(11) | 是 | 标签ID | **主键**, 自增 |
+| `name` | varchar(50) | 是 | 标签名 | **唯一索引** (`name`) |
+| `use_count` | int(11) | 否 | 使用次数 | 默认: 0, 索引 (`idx_use_count`) |
+| `created_at` | timestamp | 是 | 创建时间 | 默认: CURRENT_TIMESTAMP |
 
+---
 
-### 12. 用户会话表 (user_sessions)
+### 8. 笔记标签关联表 (`post_tags`)
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 会话ID | 主键，自增 |
-| user_id | BIGINT | 用户ID | 外键关联users |
-| token | VARCHAR(255) | 访问令牌 | 唯一 |
-| refresh_token | VARCHAR(255) | 刷新令牌 | 可为空 |
-| expires_at | TIMESTAMP | 过期时间 | 令牌过期时间 |
-| user_agent | TEXT | 用户代理 | 浏览器信息，可为空 |
-| is_active | TINYINT(1) | 是否激活 | 默认1 |
-| created_at | TIMESTAMP | 创建时间 | 会话创建时间 |
-| updated_at | TIMESTAMP | 更新时间 | 自动更新 |
+笔记与标签的多对多关联。
 
-### 13. 管理员表 (admin)
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 关联ID | **主键**, 自增 |
+| `post_id` | bigint(20) | 是 | 笔记ID | 索引 (`idx_post_id`) |
+| `tag_id` | int(11) | 是 | 标签ID | 索引 (`idx_tag_id`) |
+| `created_at` | timestamp | 是 | 创建时间 | 默认: CURRENT_TIMESTAMP |
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 管理员ID | 主键，自增 |
-| username | VARCHAR(50) | 管理员用户名 | 唯一 |
-| password | VARCHAR(255) | 管理员密码 | 加密存储 |
-| created_at | TIMESTAMP | 创建时间 | 账号创建时间 |
+> **唯一约束**: `uk_post_tag` (`post_id`, `tag_id`)
 
-### 14. 审核表 (audit)
+---
 
-| 字段名 | 类型 | 说明 | 备注 |
-|--------|------|------|------|
-| id | BIGINT | 审核ID | 主键，自增 |
-| user_id | BIGINT | 用户ID | 外键关联users |
-| type | TINYINT | 审核类型 | 1-用户审核，2-内容审核，3-评论审核 |
-| content | TEXT | 审核内容 | 待审核的具体内容 |
-| created_at | TIMESTAMP | 创建时间 | 提交审核时间 |
-| audit_time | TIMESTAMP | 审核时间 | 完成审核时间，可为空 |
-| status | TINYINT(1) | 审核状态 | 0-待审核，1-审核通过，默认0 |
+### 9. 关注关系表 (`follows`)
 
+用户之间的关注关系。
+
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 关注ID | **主键**, 自增 |
+| `follower_id` | bigint(20) | 是 | 关注者ID | 索引 (`idx_follower_id`) |
+| `following_id` | bigint(20) | 是 | 被关注者ID | 索引 (`idx_following_id`) |
+| `created_at` | timestamp | 是 | 关注时间 | 默认: CURRENT_TIMESTAMP |
+
+> **唯一约束**: `uk_follow` (`follower_id`, `following_id`)
+
+---
+
+### 10. 点赞表 (`likes`)
+
+用户对笔记或评论的点赞记录。
+
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 点赞ID | **主键**, 自增 |
+| `user_id` | bigint(20) | 是 | 用户ID | 索引 (`idx_user_id`) |
+| `target_type` | tinyint(4) | 是 | 目标类型 | 1-笔记, 2-评论 |
+| `target_id` | bigint(20) | 是 | 目标ID | |
+| `created_at` | timestamp | 是 | 点赞时间 | 默认: CURRENT_TIMESTAMP |
+
+> **唯一约束**: `uk_user_target` (`user_id`, `target_type`, `target_id`)
+> **复合索引**: `idx_target` (`target_type`, `target_id`)
+
+---
+
+### 11. 收藏表 (`collections`)
+
+用户对笔记的收藏记录。
+
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 收藏ID | **主键**, 自增 |
+| `user_id` | bigint(20) | 是 | 用户ID | 索引 (`idx_user_id`) |
+| `post_id` | bigint(20) | 是 | 笔记ID | 索引 (`idx_post_id`) |
+| `created_at` | timestamp | 是 | 收藏时间 | 默认: CURRENT_TIMESTAMP |
+
+> **唯一约束**: `uk_user_post` (`user_id`, `post_id`)
+
+---
+
+### 12. 评论表 (`comments`)
+
+笔记下的评论信息。
+
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 评论ID | **主键**, 自增 |
+| `post_id` | bigint(20) | 是 | 笔记ID | 索引 (`idx_post_id`) |
+| `user_id` | bigint(20) | 是 | 评论用户ID | 索引 (`idx_user_id`) |
+| `parent_id` | bigint(20) | 否 | 父评论ID | 索引 (`idx_parent_id`), 用于回复 |
+| `content` | text | 是 | 评论内容 | |
+| `like_count` | int(11) | 否 | 点赞数 | 默认: 0 |
+| `created_at` | timestamp | 是 | 评论时间 | 默认: CURRENT_TIMESTAMP |
+
+---
+
+### 13. 通知表 (`notifications`)
+
+用户的消息通知。
+
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 通知ID | **主键**, 自增 |
+| `user_id` | bigint(20) | 是 | 接收用户ID | 索引 (`idx_user_id`) |
+| `sender_id` | bigint(20) | 是 | 发送用户ID | 索引 (`idx_sender_id`) |
+| `type` | tinyint(4) | 是 | 通知类型 | 1-点赞, 2-评论, 3-关注 |
+| `title` | varchar(200) | 是 | 通知标题 | |
+| `target_id` | bigint(20) | 否 | 关联目标ID | 笔记ID等 |
+| `comment_id` | bigint(20) | 否 | 关联评论ID | 索引 (`idx_notifications_comment_id`) |
+| `is_read` | tinyint(1) | 否 | 是否已读 | 0-未读, 1-已读 |
+| `created_at` | timestamp | 是 | 通知时间 | 默认: CURRENT_TIMESTAMP |
+
+---
+
+### 14. 用户会话表 (`user_sessions`)
+
+管理用户登录 Session 和 Token。
+
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 会话ID | **主键**, 自增 |
+| `user_id` | bigint(20) | 是 | 用户ID | 索引 (`idx_user_id`) |
+| `token` | varchar(255) | 是 | 访问令牌 | **唯一索引** (`token`) |
+| `refresh_token` | varchar(255) | 否 | 刷新令牌 | |
+| `expires_at` | timestamp | 是 | 过期时间 | 索引 (`idx_expires_at`) |
+| `user_agent` | text | 否 | 用户代理 | |
+| `is_active` | tinyint(1) | 否 | 是否激活 | 默认: 1 |
+| `created_at` | timestamp | 是 | 创建时间 | 默认: CURRENT_TIMESTAMP |
+| `updated_at` | timestamp | 是 | 更新时间 | 默认: ON UPDATE CURRENT_TIMESTAMP |
+
+---
+
+### 15. 审核表 (`audit`)
+
+内容及用户审核记录。
+
+| 字段名 | 类型 | 必填 | 说明 | 索引/备注 |
+|---|---|---|---|---|
+| `id` | bigint(20) | 是 | 审核ID | **主键**, 自增 |
+| `user_id` | bigint(20) | 是 | 用户ID | 索引 (`idx_user_id`) |
+| `type` | tinyint(4) | 是 | 审核类型 | 1-用户, 2-内容, 3-评论 |
+| `content` | text | 是 | 审核内容 | |
+| `status` | tinyint(1) | 否 | 审核状态 | 0-待审核, 1-通过 |
+| `created_at` | timestamp | 是 | 创建时间 | 默认: CURRENT_TIMESTAMP |
+| `audit_time` | timestamp | 否 | 审核时间 | |

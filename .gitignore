@@ -48,4 +48,4 @@ Thumbs.db
 express-project/uploads/
 
 # private_config
-/java-project/src/main/resources/*.yaml
+/java-project/src/main/resources/application-*.yml

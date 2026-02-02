@@ -32,6 +32,7 @@ public class RedisConfig {
      * 配置 RedisTemplate
      * 使用 String 序列化器处理 key，JSON 序列化器处理 value
      */
+    @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);

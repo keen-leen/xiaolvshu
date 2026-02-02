@@ -72,6 +72,44 @@ public class CacheService {
     }
 
     /**
+     * 获取 List 类型缓存，如果不存在则从数据库加载并缓存
+     * 包含缓存穿透防护
+     *
+     * @param key        缓存 key
+     * @param expireTime 过期时间（秒）
+     * @param dbFallback 数据库回调函数
+     * @return 缓存的 List
+     */
+    @SuppressWarnings("unchecked")
+    public <T> java.util.List<T> getOrLoadList(String key, long expireTime, Supplier<java.util.List<T>> dbFallback) {
+        // 1. 先从缓存获取
+        Object cached = redisService.get(key);
+        
+        // 2. 如果是空值标记，说明数据库中也没有，返回空列表
+        if (NULL_VALUE.equals(cached)) {
+            return java.util.Collections.emptyList();
+        }
+        
+        // 3. 如果缓存命中，直接返回
+        if (cached instanceof java.util.List) {
+            return (java.util.List<T>) cached;
+        }
+        
+        // 4. 缓存未命中，从数据库加载
+        java.util.List<T> value = dbFallback.get();
+        
+        // 5. 如果数据库也没有，缓存空值防止穿透
+        if (value == null || value.isEmpty()) {
+            redisService.set(key, NULL_VALUE, NULL_EXPIRE);
+            return java.util.Collections.emptyList();
+        }
+        
+        // 6. 缓存数据
+        redisService.set(key, value, expireTime);
+        return value;
+    }
+
+    /**
      * 获取缓存，如果不存在则从数据库加载并缓存（带分布式锁，防止缓存击穿）
      *
      * @param key        缓存 key

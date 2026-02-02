@@ -81,9 +81,9 @@ public class RedisExpireConstant {
     public static final long HOT_POST_EXPIRE = FIVE_MINUTES;
     
     /**
-     * 分类列表缓存过期时间：1小时
+     * 分类列表缓存过期时间：1个月
      */
-    public static final long CATEGORY_LIST_EXPIRE = ONE_HOUR;
+    public static final long CATEGORY_LIST_EXPIRE = ONE_MONTH;
     
     /**
      * 热门标签缓存过期时间：30分钟

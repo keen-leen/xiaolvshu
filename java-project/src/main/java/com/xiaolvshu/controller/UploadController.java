@@ -39,11 +39,11 @@ public class UploadController {
             return Result.error("没有上传文件");
         }
         
-        if (!uploadService.isValidImageFile(file)) {
+        if (!uploadService.isValidImageFile(file, 1)) {
             return Result.error("只允许上传图片文件");
         }
         
-        if (!uploadService.checkImageFileSize(file)) {
+        if (!uploadService.checkImageFileSize(file, 1)) {
             return Result.error("文件大小超过限制（10MB）");
         }
         
@@ -81,7 +81,7 @@ public class UploadController {
         
         for (MultipartFile file : files) {
             // 验证文件
-            if (!uploadService.isValidImageFile(file)) {
+            if (!uploadService.isValidImageFile(file, 1)) {
                 UploadError error = new UploadError();
                 error.setFile(file.getOriginalFilename());
                 error.setError("只允许上传图片文件");
@@ -89,7 +89,7 @@ public class UploadController {
                 continue;
             }
             
-            if (!uploadService.checkImageFileSize(file)) {
+            if (!uploadService.checkImageFileSize(file, 1)) {
                 UploadError error = new UploadError();
                 error.setFile(file.getOriginalFilename());
                 error.setError("文件大小超过限制(10MB)");
@@ -133,11 +133,11 @@ public class UploadController {
         log.info("上传视频: {}, 带缩略图: {}", file.getOriginalFilename(), thumbnail != null ? thumbnail.getOriginalFilename() : "");
         
         // 验证视频文件
-        if (!uploadService.isValidVideoFile(file)) {
+        if (!uploadService.isValidImageFile(file, 2)) {
             return Result.error("视频格式不支持");
         }
         
-        if (!uploadService.checkVideoFileSize(file)) {
+        if (!uploadService.checkImageFileSize(file, 2)) {
             return Result.error("文件大小超过限制(100MB)");
         }
         String url;
@@ -149,10 +149,10 @@ public class UploadController {
             return Result.error("视频上传失败: " + e.getMessage());
         }
         // 如果有缩略图，上传缩略图
-        if (!uploadService.isValidImageFile(thumbnail)) {
+        if (!uploadService.isValidImageFile(thumbnail, 1)) {
             return Result.error("缩略图格式不支持");
         }
-        if (!uploadService.checkImageFileSize(thumbnail)) {
+        if (!uploadService.checkImageFileSize(thumbnail, 1)) {
             return Result.error("缩略图大小超过限制(10MB)");
         }
         String thumbnailUrl;

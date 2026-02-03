@@ -48,7 +48,7 @@ export async function uploadImage(file, options = {}) {
   try {
     if (!file) throw new Error('请选择要上传的文件')
     if (file instanceof File && !file.type.startsWith('image/')) throw new Error('请选择图片文件')
-    if (file.size > 5 * 1024 * 1024) throw new Error('图片大小不能超过5MB')
+    if (file.size > 20 * 1024 * 1024) throw new Error('图片大小不能超过20MB')
 
     // 压缩图片
     const compressedFile = await compressImage(file)

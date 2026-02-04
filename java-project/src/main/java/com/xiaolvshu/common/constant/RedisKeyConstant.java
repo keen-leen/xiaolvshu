@@ -25,6 +25,14 @@ public class RedisKeyConstant {
     public static final String USER_INFO = PROJECT_PREFIX + "user:info:";
     
     /**
+     * 用户ID映射Hash（小旅书号 -> 数据库ID）
+     * Hash Key: xiaolvshu:user:id_map
+     * Hash Field: userId (小旅书号)
+     * Hash Value: id (数据库主键ID)
+     */
+    public static final String USER_ID_MAP_HASH = PROJECT_PREFIX + "user:id_map";
+    
+    /**
      * 用户登录 Token
      * 完整 key: xiaolvshu:user:token:{userId}
      */

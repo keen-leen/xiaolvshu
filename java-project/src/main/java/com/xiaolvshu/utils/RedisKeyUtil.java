@@ -19,6 +19,25 @@ public class RedisKeyUtil {
     public static String getUserInfoKey(String userId) {
         return RedisKeyConstant.USER_INFO + userId;
     }
+    
+    /**
+     * 构建用户信息缓存 key（基于数据库ID）
+     *
+     * @param id 数据库ID
+     * @return key
+     */
+    public static String getUserInfoKey(Long id) {
+        return RedisKeyConstant.USER_INFO + "id:" + id;
+    }
+    
+    /**
+     * 获取用户ID映射的Hash key
+     *
+     * @return Hash key
+     */
+    public static String getUserIdMapHash() {
+        return RedisKeyConstant.USER_ID_MAP_HASH;
+    }
 
     /**
      * 构建用户 Token key

@@ -175,8 +175,7 @@ public class AuthService{
      */
     public UserDTO getCurrentUser() {
         Long currentUserId = UserContext.getUserId();
-        String currentUsername = UserContext.getUsername();
-        String userInfoKey = RedisKeyUtil.getUserInfoKey(currentUsername);
+        String userInfoKey = RedisKeyUtil.getUserInfoKey(currentUserId);
         User user = cacheService.getOrLoad(userInfoKey, User.class, RedisExpireConstant.USER_INFO_EXPIRE, () -> userMapper.selectById(currentUserId));
 
         if (user == null) {

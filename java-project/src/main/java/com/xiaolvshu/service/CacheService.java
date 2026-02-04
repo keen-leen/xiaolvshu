@@ -395,4 +395,57 @@ public class CacheService {
         String key = RedisKeyUtil.getLoginFailCountKey(identifier);
         redisService.delete(key);
     }
+    
+    // ==================== 用户ID映射缓存（使用Hash）====================
+    
+    /**
+     * 从Hash中获取用户ID映射（小旅书号 -> 数据库ID）
+     *
+     * @param username 小旅书号
+     * @return 数据库ID，如果不存在返回 null
+     */
+    public Long username2ID(String username) {
+        String hashKey = RedisKeyUtil.getUserIdMapHash();
+        Object value = redisService.hGet(hashKey, username);
+        
+        // 如果是空值标记，说明该用户不存在
+        if (NULL_VALUE.equals(value)) {
+            return null;
+        }
+        if (value instanceof Integer) {
+            return ((Integer) value).longValue();
+        }
+        return (Long) value;
+    }
+    
+    /**
+     * 缓存用户ID映射到Hash中
+     *
+     * @param username 小旅书号
+     * @param id     数据库ID
+     */
+    public void setUsername2ID(String username, Long id) {
+        String hashKey = RedisKeyUtil.getUserIdMapHash();
+        redisService.hSet(hashKey, username, id);
+    }
+    
+    /**
+     * 缓存用户不存在的标记到Hash中（防止缓存穿透）
+     *
+     * @param username 小旅书号
+     */
+    public void setUsername2Null(String username) {
+        String hashKey = RedisKeyUtil.getUserIdMapHash();
+        redisService.hSet(hashKey, username, NULL_VALUE);
+    }
+    
+    /**
+     * 从Hash中删除用户ID映射
+     *
+     * @param username 小旅书号
+     */
+    public void deleteUsername2ID(String username) {
+        String hashKey = RedisKeyUtil.getUserIdMapHash();
+        redisService.hDelete(hashKey, username);
+    }
 }

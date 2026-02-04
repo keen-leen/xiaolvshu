@@ -316,10 +316,9 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         
         userMapper.updateById(user);
 
-        // 更新用户信息时先删除缓存
-        String userInfoKey = RedisKeyUtil.getUserInfoKey(userId);
+        // 更新用户信息时清除缓存
+        String userInfoKey = RedisKeyUtil.getUserInfoKey(user.getId());
         cacheService.delete(userInfoKey);
-        cacheService.load(userInfoKey, user, RedisExpireConstant.USER_INFO_EXPIRE);
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         userDTO.setInterests(parseInterests(user.getInterests()));
         
@@ -374,6 +373,10 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         // 软删除：设置为不活跃
         user.setIsActive(0);
         userMapper.updateById(user);
+        
+        // 清除缓存（id 缓存和Hash映射）
+        cacheService.delete(RedisKeyUtil.getUserInfoKey(user.getId()));
+        cacheService.deleteUsername2ID(user.getUserId());
     }
     
     // ============ 私有辅助方法 ============
@@ -570,13 +573,50 @@ public class UserService extends ServiceImpl<UserMapper, User> {
             })
             .toList();
     }
+    
     /**
-     * 根据小旅书号获取用户
+     * 根据小旅书号获取用户信息
+     * 1. 先从Hash映射缓存获取 id
+     * 2. 如果有 id，用 id 查用户信息缓存
+     * 3. 如果没有 id，查数据库，并缓存映射关系
      */
     public User getUserByUserId(String userId) {
-        String userInfoKey = RedisKeyUtil.getUserInfoKey(userId);
+        // 1. 先尝试从Hash映射缓存获取数据库ID
+        Long id = cacheService.username2ID(userId);
+        
+        if (id != null) {
+            // 2. 有映射，直接用 id 查用户信息缓存
+            String userInfoKey = RedisKeyUtil.getUserInfoKey(id);
+            return cacheService.getOrLoad(userInfoKey, User.class, RedisExpireConstant.USER_INFO_EXPIRE, () ->
+                userMapper.selectById(id)
+            );
+        }
+        
+        // 3. 没有映射缓存，查数据库
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, userId));
+        
+        if (user == null) {
+            // 用户不存在，缓存空值防止穿透
+            cacheService.setUsername2Null(userId);
+            return null;
+        }
+        
+        // 4. 缓存映射关系到Hash
+        cacheService.setUsername2ID(userId, user.getId());
+        
+        // 5. 缓存用户信息（使用 id 作为 key）
+        cacheService.load(RedisKeyUtil.getUserInfoKey(user.getId()), user, RedisExpireConstant.USER_INFO_EXPIRE);
+        
+        return user;
+    }
+    
+    /**
+     * 根据数据库ID获取用户（推荐使用，缓存效率更高）
+     */
+    public User getUserById(Long id) {
+        String userInfoKey = RedisKeyUtil.getUserInfoKey(id);
         return cacheService.getOrLoad(userInfoKey, User.class, RedisExpireConstant.USER_INFO_EXPIRE, () ->
-            userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, userId))
+            userMapper.selectById(id)
         );
     }
     

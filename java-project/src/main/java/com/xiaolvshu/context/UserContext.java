@@ -1,7 +1,10 @@
 package com.xiaolvshu.context;
 
+import com.xiaolvshu.entity.User;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.Map;
 
 /**
  * 用户上下文工具类
@@ -17,24 +20,21 @@ public class UserContext {
      */
     public static Long getUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Long) {
-            return (Long) authentication.getPrincipal();
+        if (authentication != null && authentication.getPrincipal() instanceof User) {
+            return ((User)authentication.getPrincipal()).getId();
         }
         return null;
     }
     
     /**
-     * 获取当前登录用户的ID（非空版本）
-     * 
-     * @return 用户ID
-     * @throws IllegalStateException 如果用户未登录
+     * 获取当前登录用户的账号
      */
-    public static Long requireUserId() {
-        Long userId = getUserId();
-        if (userId == null) {
-            throw new IllegalStateException("用户未登录");
+    public static String getUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof User) {
+            return ((User)authentication.getPrincipal()).getUserId();
         }
-        return userId;
+        return null;
     }
     
     /**

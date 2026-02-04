@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xiaolvshu.common.constant.RedisExpireConstant;
 import com.xiaolvshu.context.UserContext;
 import com.xiaolvshu.dto.*;
 import com.xiaolvshu.entity.Category;
@@ -19,6 +20,8 @@ import com.xiaolvshu.entity.Tag;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.*;
+import com.xiaolvshu.utils.RedisKeyUtil;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,6 +54,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
     private final CategoryMapper categoryMapper;
     private final AuditMapper auditMapper;
     private final PasswordEncoder passwordEncoder;
+    private final CacheService cacheService;
 
     /**
      * 搜索用户
@@ -311,6 +315,11 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         }
         
         userMapper.updateById(user);
+
+        // 更新用户信息时先删除缓存
+        String userInfoKey = RedisKeyUtil.getUserInfoKey(userId);
+        cacheService.delete(userInfoKey);
+        cacheService.load(userInfoKey, user, RedisExpireConstant.USER_INFO_EXPIRE);
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         userDTO.setInterests(parseInterests(user.getInterests()));
         
@@ -565,7 +574,10 @@ public class UserService extends ServiceImpl<UserMapper, User> {
      * 根据小旅书号获取用户
      */
     public User getUserByUserId(String userId) {
-        return userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, userId));
+        String userInfoKey = RedisKeyUtil.getUserInfoKey(userId);
+        return cacheService.getOrLoad(userInfoKey, User.class, RedisExpireConstant.USER_INFO_EXPIRE, () ->
+            userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserId, userId))
+        );
     }
     
     // ============ 认证申请相关方法 ============

@@ -1,5 +1,6 @@
 package com.xiaolvshu.config;
 
+import com.xiaolvshu.entity.User;
 import com.xiaolvshu.utils.JwtTokenUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,6 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Map;
 
 /**
  * JWT认证过滤器
@@ -36,10 +38,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 验证JWT并设置用户信息到ThreadLocal
             if (StringUtils.hasText(jwt) && jwtTokenUtil.validateToken(jwt)) {
                 Long userId = jwtTokenUtil.getUserIdFromToken(jwt);
-                // String username = jwtTokenUtil.getUsernameFromToken(jwt);
+                String username = jwtTokenUtil.getUsernameFromToken(jwt);
+                User principal = new User();
+                principal.setId(userId);
+                principal.setUserId(username);
 
                 // 设置Spring Security认证信息
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
             filterChain.doFilter(request, response);

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -81,7 +82,7 @@ public class CacheService {
      * @return 缓存的 List
      */
     @SuppressWarnings("unchecked")
-    public <T> java.util.List<T> getOrLoadList(String key, long expireTime, Supplier<java.util.List<T>> dbFallback) {
+    public <T> List<T> getOrLoadList(String key, long expireTime, Supplier<List<T>> dbFallback) {
         // 1. 先从缓存获取
         Object cached = redisService.get(key);
         
@@ -171,11 +172,22 @@ public class CacheService {
     }
 
     /**
+     * 载入缓存
+     *
+     * @param key        缓存 key
+     * @param value      缓存值
+     * @param expireTime 过期时间（秒）
+     */
+    public void load(String key, Object value, long expireTime) {
+        redisService.set(key, value, expireTime);
+    }
+
+    /**
      * 删除缓存
      *
      * @param key 缓存 key
      */
-    public void evict(String key) {
+    public void delete(String key) {
         redisService.delete(key);
     }
 

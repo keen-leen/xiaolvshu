@@ -3,6 +3,7 @@ package com.xiaolvshu.service;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.xiaolvshu.common.constant.RedisExpireConstant;
 import com.xiaolvshu.utils.IpLocationUtil;
 import com.xiaolvshu.utils.JwtTokenUtil;
 import com.xiaolvshu.context.UserContext;
@@ -20,6 +21,7 @@ import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.AdminMapper;
 import com.xiaolvshu.mapper.UserMapper;
 import com.xiaolvshu.mapper.UserSessionMapper;
+import com.xiaolvshu.utils.RedisKeyUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,8 +47,9 @@ public class AuthService{
     private final JwtTokenUtil jwtTokenUtil;
     private final CaptchaService captchaService;
     private final PasswordEncoder passwordEncoder;
+    private final CacheService cacheService;
 
-    
+
     /**
      * 用户注册
      */
@@ -172,7 +175,10 @@ public class AuthService{
      */
     public UserDTO getCurrentUser() {
         Long currentUserId = UserContext.getUserId();
-        User user = userMapper.selectById(currentUserId);
+        String currentUsername = UserContext.getUsername();
+        String userInfoKey = RedisKeyUtil.getUserInfoKey(currentUsername);
+        User user = cacheService.getOrLoad(userInfoKey, User.class, RedisExpireConstant.USER_INFO_EXPIRE, () -> userMapper.selectById(currentUserId));
+
         if (user == null) {
             throw new BusinessException("用户不存在");
         }

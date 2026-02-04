@@ -13,10 +13,10 @@ public class RedisKeyUtil {
     /**
      * 构建用户信息缓存 key
      *
-     * @param userId 用户ID
+     * @param username 小旅书号
      * @return key
      */
-    public static String getUserInfoKey(Long userId) {
+    public static String getUserInfoKey(String userId) {
         return RedisKeyConstant.USER_INFO + userId;
     }
 

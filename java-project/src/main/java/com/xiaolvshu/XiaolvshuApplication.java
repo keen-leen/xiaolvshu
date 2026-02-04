@@ -10,6 +10,5 @@ public class XiaolvshuApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(XiaolvshuApplication.class, args);
-        System.out.println("● 小旅书后端服务启动成功");
     }
 }

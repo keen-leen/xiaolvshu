@@ -28,6 +28,9 @@ buildNumber.properties
 *.log
 logs/
 
+# Logback 日志目录
+/logs/
+
 # Package Files
 *.jar
 *.war

@@ -44,7 +44,7 @@ public class UploadController {
         }
         
         if (!uploadService.checkImageFileSize(file, 1)) {
-            return Result.error("文件大小超过限制（10MB）");
+            return Result.error("文件大小超过限制（20MB）");
         }
         
         // 上传图片
@@ -92,7 +92,7 @@ public class UploadController {
             if (!uploadService.checkImageFileSize(file, 1)) {
                 UploadError error = new UploadError();
                 error.setFile(file.getOriginalFilename());
-                error.setError("文件大小超过限制(10MB)");
+                error.setError("文件大小超过限制(20MB)");
                 errors.add(error);
                 continue;
             }
@@ -153,7 +153,7 @@ public class UploadController {
             return Result.error("缩略图格式不支持");
         }
         if (!uploadService.checkImageFileSize(thumbnail, 1)) {
-            return Result.error("缩略图大小超过限制(10MB)");
+            return Result.error("缩略图大小超过限制(20MB)");
         }
         String thumbnailUrl;
         try {

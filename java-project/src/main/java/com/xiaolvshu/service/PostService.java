@@ -460,23 +460,26 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
         }
         Long userId = tarUser != null ? tarUser.getId() : null;
 
-        // 暂时将推荐置为全部
-        if (category != null && category.equals("recommend")) {
-            category = null;
+        // category="recommend" 时按热度公式排序（不过滤分类），其余按发布时间降序
+        final List<Post> posts;
+        final long total;
+        if ("recommend".equals(category)) {
+            long offset = (long) (page - 1) * limit;
+            posts = baseMapper.selectRecommended(offset, limit, type);
+            total = baseMapper.countRecommended(type);
+            log.info("获取推荐帖子，页码：{}，每页：{}，类型：{}，总数：{}", page, limit, type, total);
+        } else {
+            IPage<Post> result = baseMapper.selectPage(pageParam,
+                    new LambdaQueryWrapper<Post>()
+                            .eq(category != null, Post::getCategoryId, category)
+                            .eq(isDraft != null, Post::getIsDraft, isDraft)
+                            .eq(userId != null, Post::getUserId, userId)
+                            .eq(type != null, Post::getType, type)
+                            .orderByDesc(Post::getCreatedAt));
+            posts = result.getRecords();
+            total = result.getTotal();
+            log.info("获取帖子列表，页码：{}，每页数量：{}，分类：{}，类型：{}，用户ID：{}，总数：{}", page, limit, category, type, userId, total);
         }
-
-        IPage<Post> result = baseMapper.selectPage(pageParam,
-                new LambdaQueryWrapper<Post>()
-                        .eq(category != null, Post::getCategoryId, category)
-                        .eq(isDraft != null, Post::getIsDraft, isDraft)
-                        .eq(userId != null, Post::getUserId, userId)
-                        .eq(type != null, Post::getType, type)
-                        .orderByDesc(Post::getCreatedAt));
-
-        Long total = result.getTotal();
-        log.info("获取帖子列表，页码：{}，每页数量：{}，分类：{}，类型：{}，用户ID：{}，总数：{}", page, limit, category, type, userId, total);
-
-        List<Post> posts = result.getRecords();
         if (posts.isEmpty()) {
             return PageResult.empty(page, limit);
         }

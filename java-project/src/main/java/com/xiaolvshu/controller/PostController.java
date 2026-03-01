@@ -67,7 +67,7 @@ public class PostController {
         PageResult<PostResponse> posts = postService.getPosts(request);
         return Result.success(posts);
     }
-    
+
     /**
      * 获取帖子详情
      */

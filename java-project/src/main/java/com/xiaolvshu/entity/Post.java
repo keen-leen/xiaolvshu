@@ -91,5 +91,12 @@ public class Post implements Serializable {
      * 更新时间
      */
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;    
+    private LocalDateTime updatedAt;
+
+    /**
+     * 热度分（非数据库字段，由推荐查询动态计算）
+     * 公式：(点赞×3 + 收藏×2 + 评论×2 + MIN(浏览×0.1, 50)) / (发布小时数+2)^1.5
+     */
+    @TableField(exist = false)
+    private Double hotScore;
 }

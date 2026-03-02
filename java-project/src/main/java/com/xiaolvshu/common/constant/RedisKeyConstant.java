@@ -120,6 +120,12 @@ public class RedisKeyConstant {
      */
     public static final String COMMENT_USER_LIKES = PROJECT_PREFIX + "comment:user_likes:";
 
+    /**
+     * 用户点赞缓存初始化标记
+     * 完整 key: xiaolvshu:like:user_init:{targetType}:{userId}
+     */
+    public static final String LIKE_USER_INIT = PROJECT_PREFIX + "like:user_init:";
+
     // ==================== 分类/标签模块 ====================
     
     /**

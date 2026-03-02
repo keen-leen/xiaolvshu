@@ -182,6 +182,17 @@ public class RedisKeyUtil {
         return RedisKeyConstant.COMMENT_USER_LIKES + userId;
     }
 
+    /**
+     * 构建用户点赞缓存初始化标记 key
+     *
+     * @param userId     用户ID
+     * @param targetType 目标类型（1-笔记，2-评论）
+     * @return key
+     */
+    public static String getLikeUserInitKey(Long userId, Integer targetType) {
+        return RedisKeyConstant.LIKE_USER_INIT + targetType + ":" + userId;
+    }
+
     // ==================== 分类/标签模块 ====================
 
     /**

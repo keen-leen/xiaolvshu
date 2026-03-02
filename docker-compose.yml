@@ -23,3 +23,15 @@ services:
       - ./docker/redis/data:/data
     command:
       redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-xiaolvshu-dev
+    ports:
+      - "15672:5672"
+      - "25672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - ./docker/rabbitmq/data:/var/lib/rabbitmq

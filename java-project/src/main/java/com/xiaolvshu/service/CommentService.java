@@ -43,6 +43,7 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
     private final CommentMapper commentMapper;
     private final UserMapper userMapper;
     private final LikeMapper likeMapper;
+    private final LikeService likeService;
     private final PostMapper postMapper;
     private final NotificationMapper notificationMapper;
     
@@ -87,21 +88,15 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
                 .collect(Collectors.toList());
         Map<Long, Long> replyCountMap = getReplyCountMap(commentIds);
         
-        // 批量获取当前用户的点赞状态
+        // 批量获取当前用户的点赞状态（从 Redis 缓存查询）
         final Set<Long> likedSet;
         Long currentUserId = UserContext.getUserId();
         if (currentUserId != null) {
-            likedSet = likeMapper.selectList(
-                new LambdaQueryWrapper<Like>()
-                    .eq(Like::getUserId, currentUserId)
-                    .eq(Like::getTargetType, Like.TARGET_TYPE_COMMENT)
-                    .in(Like::getTargetId, commentIds))
-                .stream()
-                .map(Like::getTargetId)
-                .collect(Collectors.toSet());
+            likedSet = likeService.getLikedTargetIds(currentUserId, commentIds, Like.TARGET_TYPE_COMMENT);
         } else {
             likedSet = Set.of();
         }
+        Map<Long, Integer> likeCountMap = likeService.getCommentLikeCountMap(commentIds);
         
         // 转换为响应对象
         List<PostCommentResponse> responseList = comments.stream()
@@ -109,7 +104,8 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
                         comment,
                         userMap.get(comment.getUserId()),
                         replyCountMap.getOrDefault(comment.getId(), 0L).intValue(),
-                        likedSet.contains(comment.getId())))
+                likedSet.contains(comment.getId())))
+            .peek(response -> response.setLikeCount(likeCountMap.getOrDefault(response.getId(), response.getLikeCount())))
                 .toList();
         
         return new PageResult<>(responseList, page, limit, result.getTotal());
@@ -146,21 +142,16 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
         Map<Long, User> userMap = userMapper.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
         
-        // 批量获取当前用户的点赞状态
+        // 批量获取当前用户的点赞状态（从 Redis 缓存查询）
         final Set<Long> likedSet;
         Long currentUserId = UserContext.getUserId();
+        List<Long> replyIds = comments.stream().map(Comment::getId).toList();
         if (currentUserId != null) {
-            likedSet = likeMapper.selectList(
-                new LambdaQueryWrapper<Like>()
-                    .eq(Like::getUserId, currentUserId)
-                    .eq(Like::getTargetType, Like.TARGET_TYPE_COMMENT)
-                    .in(Like::getTargetId, comments.stream().map(Comment::getId).toList()))
-                .stream()
-                .map(Like::getTargetId)
-                .collect(Collectors.toSet());
+            likedSet = likeService.getLikedTargetIds(currentUserId, replyIds, Like.TARGET_TYPE_COMMENT);
         } else {
             likedSet = Set.of();
         }
+        Map<Long, Integer> likeCountMap = likeService.getCommentLikeCountMap(replyIds);
         
         // 转换为响应对象
         List<PostCommentResponse> responseList = comments.stream()
@@ -168,7 +159,8 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
                         comment,
                         userMap.get(comment.getUserId()),
                         0,
-                        likedSet.contains(comment.getId())))
+                likedSet.contains(comment.getId())))
+            .peek(response -> response.setLikeCount(likeCountMap.getOrDefault(response.getId(), response.getLikeCount())))
                 .toList();
         
         return new PageResult<>(responseList, page, limit, result.getTotal());

@@ -2,8 +2,11 @@ package com.xiaolvshu.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.serializer.GenericToStringSerializer;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.serializer.RedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -572,6 +575,25 @@ public class RedisService {
         DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>(script, Long.class);
         Long result = redisTemplate.execute(redisScript, Collections.singletonList(lockKey), requestId);
         return Long.valueOf(1L).equals(result);
+    }
+
+    /**
+     * 执行 Lua 脚本并返回 Long 结果
+     *
+     * @param script Lua 脚本
+     * @param keys   Redis keys
+     * @param args   脚本参数
+     * @return 返回结果（null 时返回 0）
+     */
+    public long evalLong(String script, List<String> keys, Object... args) {
+        DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>(script, Long.class);
+        RedisSerializer<String> stringSerializer = new StringRedisSerializer();
+        RedisSerializer<Long> longSerializer = new GenericToStringSerializer<>(Long.class);
+        String[] stringArgs = Arrays.stream(args)
+                .map(String::valueOf)
+                .toArray(String[]::new);
+        Long result = redisTemplate.execute(redisScript, stringSerializer, longSerializer, keys, stringArgs);
+        return result != null ? result : 0L;
     }
 
     // ==================== 限流操作 ====================

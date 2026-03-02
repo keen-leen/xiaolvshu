@@ -11,6 +11,8 @@ import com.xiaolvshu.entity.*;
 import com.xiaolvshu.exception.BusinessException;
 import com.xiaolvshu.mapper.*;
 import com.xiaolvshu.utils.MentionParser;
+
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -27,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class PostService extends ServiceImpl<PostMapper, Post> {
 
     private final UserMapper userMapper;
@@ -36,24 +39,9 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
     private final PostTagMapper postTagMapper;
     private final TagMapper tagMapper;
     private final LikeMapper likeMapper;
+    private final LikeService likeService;
     private final CollectionMapper collectionMapper;
     private final NotificationMapper notificationMapper;
-
-    public PostService(PostMapper postMapper, UserMapper userMapper, CategoryMapper categoryMapper,
-                       PostImageMapper postImageMapper, PostVideoMapper postVideoMapper,
-                       PostTagMapper postTagMapper, TagMapper tagMapper,
-                       LikeMapper likeMapper, CollectionMapper collectionMapper,
-                       NotificationMapper notificationMapper) {
-        this.userMapper = userMapper;
-        this.categoryMapper = categoryMapper;
-        this.postImageMapper = postImageMapper;
-        this.postVideoMapper = postVideoMapper;
-        this.postTagMapper = postTagMapper;
-        this.tagMapper = tagMapper;
-        this.likeMapper = likeMapper;
-        this.collectionMapper = collectionMapper;
-        this.notificationMapper = notificationMapper;
-    }
 
     /**
      * 创建笔记
@@ -544,15 +532,10 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
         final Set<Long> likedSet;
         final Set<Long> collectedSet;
         Long currentUserId = UserContext.getUserId();
+        Map<Long, Integer> postLikeCountMap = likeService.getPostLikeCountMap(postIds);
         if (currentUserId != null) {
-            likedSet = likeMapper.selectList(
-                    new LambdaQueryWrapper<Like>()
-                            .eq(Like::getUserId, currentUserId)
-                            .eq(Like::getTargetType, 1)
-                            .in(Like::getTargetId, postIds))
-                    .stream()
-                    .map(Like::getTargetId)
-                    .collect(Collectors.toSet());
+            // 从 Redis 缓存查询点赞状态
+            likedSet = likeService.getLikedTargetIds(currentUserId, postIds, Like.TARGET_TYPE_POST);
 
             collectedSet = collectionMapper.selectList(
                     new LambdaQueryWrapper<Collection>()
@@ -576,7 +559,8 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
                         videoMap.get(post.getId()),
                         postTagMap.get(post.getId()),
                         likedSet.contains(post.getId()),
-                        collectedSet.contains(post.getId())))
+                collectedSet.contains(post.getId())))
+            .peek(response -> response.setLikeCount(postLikeCountMap.getOrDefault(response.getId(), response.getLikeCount())))
                 .toList();
 
         return new PageResult<>(postResponses, page, limit, total);
@@ -640,19 +624,17 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
         boolean collected = false;
         Long currentUserId = UserContext.getUserId();
         if (currentUserId != null) {
-            liked = likeMapper.selectCount(
-                    new LambdaQueryWrapper<Like>()
-                            .eq(Like::getUserId, currentUserId)
-                            .eq(Like::getTargetType, 1)
-                            .eq(Like::getTargetId, id)) > 0;
+            // 从 Redis 缓存查询点赞状态
+            liked = likeService.isLiked(currentUserId, id, Like.TARGET_TYPE_POST);
 
             collected = collectionMapper.selectCount(
                     new LambdaQueryWrapper<Collection>()
                             .eq(Collection::getUserId, currentUserId)
                             .eq(Collection::getPostId, id)) > 0;
         }
-
-        return convertToResponse(post, user, category, images, video, tags, liked, collected);
+        PostResponse response = convertToResponse(post, user, category, images, video, tags, liked, collected);
+        response.setLikeCount(likeService.getPostLikeCount(id));
+        return response;
     }
 
     /**
@@ -758,6 +740,7 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
         final Set<Long> likedSet;
         final Set<Long> collectedSet;
         Long uid = UserContext.getUserId();
+        Map<Long, Integer> postLikeCountMap = likeService.getPostLikeCountMap(postIds);
         if (uid != null) {
             likedSet = likeMapper.selectList(
                 new LambdaQueryWrapper<Like>()
@@ -790,6 +773,7 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
                 postTagMap.get(post.getId()),
                 likedSet.contains(post.getId()),
                 collectedSet.contains(post.getId())))
+            .peek(response -> response.setLikeCount(postLikeCountMap.getOrDefault(response.getId(), response.getLikeCount())))
             .toList();
 
         return new PageResult<>(postResponses, page, limit, result.getTotal());

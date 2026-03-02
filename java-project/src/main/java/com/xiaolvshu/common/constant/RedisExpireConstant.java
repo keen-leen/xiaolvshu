@@ -110,6 +110,11 @@ public class RedisExpireConstant {
      */
     public static final long COUNTER_EXPIRE = ONE_DAY;
 
+    /**
+     * 用户点赞集合缓存过期时间：1天
+     */
+    public static final long LIKE_SET_EXPIRE = ONE_DAY;
+
     private RedisExpireConstant() {
         // 私有构造函数，防止实例化
     }

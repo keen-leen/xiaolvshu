@@ -51,6 +51,6 @@ express-project/uploads/
 /java-project/src/main/resources/application-*.yml
 
 # docker
-# /docker
+docker/
 
-# /xiaolvshu
+xiaolvshu/

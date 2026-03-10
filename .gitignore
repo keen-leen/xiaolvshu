@@ -49,8 +49,9 @@ express-project/uploads/
 
 # private_config
 /java-project/src/main/resources/application-*.yml
+/java-project/src/main/resources/application-*.yaml
 
 # docker
-docker/
+/docker/
 
-xiaolvshu/
+/xiaolvshu/

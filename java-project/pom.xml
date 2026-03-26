@@ -14,7 +14,7 @@
 
     <groupId>com.xiaolvshu</groupId>
     <artifactId>xiaolvshu-backend</artifactId>
-    <version>1.0.2</version>
+    <version>2.0.1</version>
     <name>xiaolvshu-backend</name>
     <description>小旅书旅游交流社区 - Java后端服务</description>
 

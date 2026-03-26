@@ -58,3 +58,6 @@ build/
 # Environment
 .env
 .env.local
+.env.dev
+.env.release
+.env.*

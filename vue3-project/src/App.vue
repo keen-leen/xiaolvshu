@@ -14,6 +14,7 @@ import ChangePasswordModal from '@/components/modals/ChangePasswordModal.vue'
 import KeyboardShortcutsModal from '@/components/modals/KeyboardShortcutsModal.vue'
 import AccountSecurityModal from '@/components/modals/AccountSecurityModal.vue'
 import VerifiedModal from '@/components/modals/VerifiedModal.vue'
+import TravelAiDialog from '@/components/modals/TravelAiDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useConfirm } from '@/views/admin/composables/useConfirm'
 
@@ -102,6 +103,7 @@ onMounted(() => {
     <AccountSecurityModal v-model:visible="accountSecurityStore.showAccountSecurityModal"
       @close="accountSecurityStore.closeAccountSecurityModal" />
     <VerifiedModal v-if="verifiedStore.showVerifiedModal" @close="verifiedStore.closeVerifiedModal" />
+    <TravelAiDialog />
     <ConfirmDialog v-model:visible="confirmState.visible" :title="confirmState.title" :message="confirmState.message"
       :type="confirmState.type" :confirm-text="confirmState.confirmText" :cancel-text="confirmState.cancelText"
       :show-cancel="confirmState.showCancel" @confirm="handleConfirm" @cancel="handleCancel" />

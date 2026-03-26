@@ -61,6 +61,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET,"/auth/**", "/health").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/ai/travel/**").permitAll()
                 // 搜索相关公开接口
                 .requestMatchers(HttpMethod.GET, "/search").permitAll()
                 // 分类相关公开接口

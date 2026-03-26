@@ -94,6 +94,18 @@ public class Post implements Serializable {
     private LocalDateTime updatedAt;
 
     /**
+     * 是否已完成向量化：0-未完成，1-已完成
+     */
+    @TableField("is_vectorized")
+    private Integer isVectorized;
+
+    /**
+     * 最近一次向量化时间
+     */
+    @TableField("vectorized_at")
+    private LocalDateTime vectorizedAt;
+
+    /**
      * 热度分（非数据库字段，由推荐查询动态计算）
      * 公式：(点赞×3 + 收藏×2 + 评论×2 + MIN(浏览×0.1, 50)) / (发布小时数+2)^1.5
      */

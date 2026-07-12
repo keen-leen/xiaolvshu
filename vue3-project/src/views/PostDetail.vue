@@ -13,6 +13,11 @@
         <SvgIcon name="close" />
       </button>
 
+      <button v-if="postData" class="post-ai-btn" @click="askTravelAi">
+        <SvgIcon name="magic" width="18" height="18" color="white" />
+        <span>AI规划</span>
+      </button>
+
       <DetailCard :item="postData" :page-mode="true" :target-comment-id="targetCommentId" />
     </div>
   </div>
@@ -24,9 +29,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { getPostDetail } from '@/api/posts'
 import DetailCard from '@/components/DetailCard.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
+import { useTravelAiStore } from '@/stores/travelAi'
 
 const route = useRoute()
 const router = useRouter()
+const travelAiStore = useTravelAiStore()
 
 const postData = ref(null)
 const loading = ref(true)
@@ -48,6 +55,20 @@ const updateShowBackButton = () => {
 // 返回主页
 const goBack = () => {
   router.push('/explore')
+}
+
+const askTravelAi = () => {
+  if (!postData.value) {
+    return
+  }
+
+  const title = postData.value.title || '这篇笔记'
+  const prompt = `请基于小旅书笔记《${title}》帮我规划一份旅行路线，包含行程安排、预算建议和避坑提醒。`
+  travelAiStore.openAssistant(prompt, {
+    type: 'post',
+    postId: postData.value.id,
+    title
+  })
 }
 
 // 获取笔记详情
@@ -176,6 +197,25 @@ onUnmounted(() => {
   background: rgba(144, 144, 144, 0.292);
 }
 
+.post-ai-btn {
+  position: fixed;
+  right: 24px;
+  bottom: 86px;
+  z-index: 1002;
+  border: none;
+  border-radius: 999px;
+  background: var(--primary-color);
+  color: #fff;
+  height: 40px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 20px var(--primary-color-shadow);
+  cursor: pointer;
+  font-weight: 700;
+}
+
 /* 加载状态样式 */
 .loading-container {
   display: flex;
@@ -200,6 +240,12 @@ onUnmounted(() => {
     min-height: calc(100vh - 64px);
     width: 100%;
   }
+
+  .post-ai-btn {
+    right: 16px;
+    bottom: 112px;
+  }
+
 }
 
 @media (max-width: 768px) {

@@ -1,16 +1,11 @@
-import request from './request'
 import apiConfig from '@/config/api'
 
 export const travelAiApi = {
-  chat(payload) {
-    return request.post('/ai/travel/chat', payload)
-  },
-
-  async chatStream(payload, handlers = {}) {
+  async chat(payload, handlers = {}) {
     const token = localStorage.getItem('token')
     const adminToken = localStorage.getItem('admin_token')
 
-    const response = await fetch(`${apiConfig.baseURL}/ai/travel/chat/stream`, {
+    const response = await fetch(`${apiConfig.baseURL}/ai/travel/chat`, {
       method: 'POST',
       headers: {
         'Accept': 'text/event-stream',
@@ -40,6 +35,22 @@ export const travelAiApi = {
           handlers.onRefs(JSON.parse(data || '[]'))
         } catch (e) {
           handlers.onRefs([])
+        }
+        return
+      }
+      if (eventName === 'step' && handlers.onStep) {
+        try {
+          handlers.onStep(JSON.parse(data || '{}'))
+        } catch (e) {
+          handlers.onStep({ raw: data })
+        }
+        return
+      }
+      if (eventName === 'tool' && handlers.onTool) {
+        try {
+          handlers.onTool(JSON.parse(data || '{}'))
+        } catch (e) {
+          handlers.onTool({ raw: data })
         }
         return
       }

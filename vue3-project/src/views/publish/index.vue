@@ -71,6 +71,10 @@
               <SvgIcon name="magic" width="16" height="16" />
               <span>文字配图</span>
             </button>
+            <button type="button" class="travel-ai-draft-btn" @click="openTravelAiDraft">
+              <SvgIcon name="chat" width="16" height="16" />
+              <span>AI整理攻略</span>
+            </button>
           </div>
         </div>
 
@@ -156,12 +160,14 @@ import EmojiPicker from '@/components/EmojiPicker.vue'
 import MentionModal from '@/components/mention/MentionModal.vue'
 import ContentEditableInput from '@/components/ContentEditableInput.vue'
 import TextImageModal from '@/views/publish/components/TextImageModal.vue'
+import { useTravelAiStore } from '@/stores/travelAi'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const authStore = useAuthStore()
 const navigationStore = useNavigationStore()
+const travelAiStore = useTravelAiStore()
 const { lock, unlock } = useScrollLock()
 
 const multiImageUploadRef = ref(null)
@@ -334,6 +340,17 @@ const switchUploadType = (type) => {
 const openTextImageModal = () => {
   showTextImageModal.value = true
   lock()
+}
+
+const openTravelAiDraft = () => {
+  const parts = []
+  if (form.title.trim()) parts.push(`标题：${form.title.trim()}`)
+  if (form.content.trim()) parts.push(`正文：${form.content.trim()}`)
+  if (form.tags.length) parts.push(`标签：${form.tags.join('、')}`)
+  const prompt = parts.length
+    ? `请帮我把这篇旅行笔记整理成可发布的攻略结构，并补充行程亮点、预算建议和避坑提醒：${parts.join('；')}`
+    : '请帮我生成一篇旅行笔记的攻略提纲，包含标题、路线、亮点、预算建议和避坑提醒。'
+  travelAiStore.openAssistant(prompt, { type: 'publish' })
 }
 
 const closeTextImageModal = () => {
@@ -1634,12 +1651,16 @@ const handleSaveDraft = async () => {
 .text-image-section {
   margin-top: 0.75rem;
   display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   justify-content: flex-start;
 }
 
-.text-image-btn {
+.text-image-btn,
+.travel-ai-draft-btn {
   display: flex;
   align-items: center;
+  gap: 0.25rem;
   padding: 0.4rem;
   background: var(--primary-color);
   color: var(--button-text-color);
@@ -1651,11 +1672,22 @@ const handleSaveDraft = async () => {
   transition: all 0.2s ease;
 }
 
+.travel-ai-draft-btn {
+  background: var(--bg-color-secondary);
+  color: var(--text-color-primary);
+  border: 1px solid var(--border-color-primary);
+}
+
 .text-image-btn:hover {
   background: var(--primary-color-dark);
 }
 
-.text-image-btn:active {
+.travel-ai-draft-btn:hover {
+  background: var(--bg-color-tertiary);
+}
+
+.text-image-btn:active,
+.travel-ai-draft-btn:active {
   transform: translateY(0);
   box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
 }

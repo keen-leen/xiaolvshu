@@ -45,6 +45,7 @@ const unreadCount = computed(() => notificationStore.unreadCount)
 // 底部导航配置
 const footerList = ref([
     { label: 'explore', icon: 'home', path: '/explore' },
+    { label: 'travel-ai', icon: 'magic', path: '/travel-ai' },
     { label: 'publish', icon: 'publish', path: '/publish' },
     { label: 'notification', icon: 'notification', path: '/notification' },
     { label: 'user', icon: 'user', path: '/user' },

@@ -15,6 +15,10 @@ public class TravelChatResponse {
 
     private List<TravelNoteReference> references;
 
+    private List<TravelAgentStep> agentSteps;
+
+    private List<TravelToolCall> toolCalls;
+
     @Data
     public static class TravelNoteReference {
         private Long postId;

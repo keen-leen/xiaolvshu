@@ -11,6 +11,7 @@ import PostDetail from '@/views/PostDetail.vue'
 import SearchResult from '@/views/search/SearchResult.vue'
 import PostManagementPage from '@/views/post-management/index.vue'
 import DraftBoxPage from '@/views/draft-box/index.vue'
+import TravelAiPage from '@/views/travel-ai/index.vue'
 import NotFound from '@/views/NotFound.vue'
 import { getValidChannelPaths } from '@/config/channels'
 
@@ -152,6 +153,11 @@ const router = createRouter({
           path: 'draft-box',
           name: 'draft_box',
           component: DraftBoxPage
+        },
+        {
+          path: 'travel-ai',
+          name: 'travel_ai',
+          component: TravelAiPage
         },
         // 404页面 - 捕获所有未匹配的路由
         {

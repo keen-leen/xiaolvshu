@@ -1,20 +1,25 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, nextTick, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import travelAiApi from '@/api/ai'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
+import SvgIcon from '@/components/SvgIcon.vue'
+import { useTravelAiStore } from '@/stores/travelAi'
 
 const route = useRoute()
+const router = useRouter()
+const travelAiStore = useTravelAiStore()
 
-const open = ref(false)
 const loading = ref(false)
 const userInput = ref('')
 const messages = ref([
   {
     role: 'assistant',
-    content: '你好，我是小旅书旅行攻略助手。告诉我你的目的地、天数和预算，我会结合社区笔记为你做攻略。',
-    references: []
+    content: '你好，我是小旅书旅行助手。告诉我你的目的地、天数和预算，我会结合社区笔记为你做攻略。',
+    references: [],
+    agentSteps: [],
+    toolResults: []
   }
 ])
 
@@ -97,7 +102,8 @@ const renderAssistantMarkdown = (content) => {
   })
 }
 
-const hiddenOnRoute = computed(() => route.path.startsWith('/admin'))
+const hiddenOnRoute = computed(() => route.path.startsWith('/admin') || route.path.startsWith('/travel-ai'))
+const open = computed(() => travelAiStore.visible)
 
 const canSend = computed(() => !loading.value && userInput.value.trim().length > 0)
 
@@ -108,12 +114,17 @@ const quickPrompts = [
 ]
 
 const openDialog = () => {
-  open.value = true
+  travelAiStore.openAssistant()
   nextTick(scrollToBottom)
 }
 
 const closeDialog = () => {
-  open.value = false
+  travelAiStore.closeAssistant()
+}
+
+const openFullPage = () => {
+  travelAiStore.closeAssistant()
+  router.push('/travel-ai')
 }
 
 const scrollToBottom = () => {
@@ -126,6 +137,18 @@ const scrollToBottom = () => {
 const applyPrompt = (prompt) => {
   userInput.value = prompt
 }
+
+watch(
+  () => travelAiStore.initialPrompt,
+  (prompt) => {
+    if (!prompt) {
+      return
+    }
+    userInput.value = prompt
+    travelAiStore.consumeInitialPrompt()
+    nextTick(scrollToBottom)
+  }
+)
 
 const buildHistory = () => {
   return messages.value
@@ -154,7 +177,9 @@ const sendMessage = async () => {
   const assistantMessage = {
     role: 'assistant',
     content: '',
-    references: []
+    references: [],
+    agentSteps: [],
+    toolResults: []
   }
   messages.value.push(assistantMessage)
   const assistantIndex = messages.value.length - 1
@@ -163,7 +188,7 @@ const sendMessage = async () => {
   nextTick(scrollToBottom)
 
   try {
-    await travelAiApi.chatStream(
+    await travelAiApi.chat(
       {
         message: content,
         topK: 5,
@@ -178,6 +203,14 @@ const sendMessage = async () => {
           messages.value[assistantIndex].references = refs || []
           nextTick(scrollToBottom)
         },
+        onStep: (step) => {
+          messages.value[assistantIndex].agentSteps.push(step)
+          nextTick(scrollToBottom)
+        },
+        onTool: (tool) => {
+          messages.value[assistantIndex].toolResults.push(tool)
+          nextTick(scrollToBottom)
+        },
         onError: (errorText) => {
           messages.value[assistantIndex].content = errorText || '流式响应失败，请稍后重试'
         }
@@ -188,19 +221,10 @@ const sendMessage = async () => {
       messages.value[assistantIndex].content = '已完成攻略生成。'
     }
   } catch (e) {
-    const response = await travelAiApi.chat({
-      message: content,
-      topK: 5,
-      history: buildHistory()
-    })
-
-    if (response?.success && response?.data) {
-      messages.value[assistantIndex].content = response.data.answer || '已完成攻略生成。'
-      messages.value[assistantIndex].references = response.data.references || []
-    } else {
-      messages.value[assistantIndex].content = `请求失败：${response?.message || '请稍后重试'}`
-      messages.value[assistantIndex].references = []
-    }
+    messages.value[assistantIndex].content = `流式请求失败：${e?.message || '请稍后重试'}`
+    messages.value[assistantIndex].references = []
+    messages.value[assistantIndex].agentSteps = []
+    messages.value[assistantIndex].toolResults = []
   }
 
   loading.value = false
@@ -211,14 +235,21 @@ const sendMessage = async () => {
 <template>
   <div v-if="!hiddenOnRoute" class="travel-ai-widget">
     <button v-if="!open" class="floating-trigger" @click="openDialog">
-      旅行AI
+      <SvgIcon name="magic" width="18" height="18" color="white" />
+      <span>旅行助手</span>
     </button>
 
     <div v-if="open" class="dialog-mask" @click="closeDialog">
       <div class="dialog-card" @click.stop>
         <header class="dialog-header">
-          <div class="header-title">旅行攻略助手</div>
-          <button class="close-btn" @click="closeDialog">×</button>
+          <div>
+            <div class="header-title">旅行助手</div>
+            <div class="header-subtitle">结合社区笔记生成路线</div>
+          </div>
+          <div class="header-actions">
+            <button class="page-btn" @click="openFullPage">完整页面</button>
+            <button class="close-btn" @click="closeDialog">×</button>
+          </div>
         </header>
 
         <div class="quick-prompts">
@@ -231,6 +262,11 @@ const sendMessage = async () => {
           <div v-for="(item, idx) in messages" :key="idx" :class="['message-item', item.role]">
             <div v-if="item.role === 'assistant'" class="message-bubble markdown-body" v-html="renderAssistantMarkdown(item.content)"></div>
             <div v-else class="message-bubble">{{ item.content }}</div>
+            <div v-if="item.role === 'assistant' && item.agentSteps && item.agentSteps.length > 0" class="agent-step-list">
+              <span v-for="step in item.agentSteps" :key="step.step" class="agent-step-item">
+                {{ step.action === 'tool' ? step.tool_call?.tool_name : '生成答案' }}
+              </span>
+            </div>
             <div v-if="item.role === 'assistant' && item.references && item.references.length > 0" class="source-list">
               <a
                 v-for="ref in item.references"
@@ -247,7 +283,7 @@ const sendMessage = async () => {
           </div>
 
           <div v-if="loading" class="message-item assistant">
-            <div class="message-bubble loading-bubble">正在检索笔记并生成攻略...</div>
+            <div class="message-bubble loading-bubble">Agent 正在判断工具并生成攻略...</div>
           </div>
         </div>
 
@@ -277,19 +313,22 @@ const sendMessage = async () => {
 .floating-trigger {
   border: none;
   border-radius: 999px;
-  background: linear-gradient(135deg, #0b8f71, #14a37f);
+  background: var(--primary-color);
   color: #fff;
   font-size: 14px;
   font-weight: 600;
-  padding: 12px 18px;
-  box-shadow: 0 8px 20px rgba(8, 113, 90, 0.35);
+  padding: 12px 16px;
+  box-shadow: 0 8px 20px var(--primary-color-shadow);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .dialog-mask {
   position: fixed;
   inset: 0;
-  background: rgba(9, 18, 16, 0.42);
+  background: var(--overlay-bg);
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
@@ -299,8 +338,9 @@ const sendMessage = async () => {
 .dialog-card {
   width: min(420px, calc(100vw - 20px));
   height: min(680px, calc(100vh - 40px));
-  background: #fff;
-  border-radius: 16px;
+  background: var(--bg-color-primary);
+  border: 1px solid var(--border-color-primary);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -312,13 +352,35 @@ const sendMessage = async () => {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px;
-  border-bottom: 1px solid #edf1ef;
+  border-bottom: 1px solid var(--border-color-primary);
 }
 
 .header-title {
   font-size: 16px;
   font-weight: 700;
-  color: #18342e;
+  color: var(--text-color-primary);
+}
+
+.header-subtitle {
+  color: var(--text-color-tertiary);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-btn {
+  height: 28px;
+  border: 1px solid var(--border-color-primary);
+  border-radius: 999px;
+  background: var(--bg-color-secondary);
+  color: var(--text-color-primary);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .close-btn {
@@ -326,7 +388,8 @@ const sendMessage = async () => {
   height: 28px;
   border: none;
   border-radius: 50%;
-  background: #eef5f2;
+  background: var(--bg-color-secondary);
+  color: var(--text-color-primary);
   cursor: pointer;
 }
 
@@ -335,13 +398,13 @@ const sendMessage = async () => {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  border-bottom: 1px solid #edf1ef;
+  border-bottom: 1px solid var(--border-color-primary);
 }
 
 .prompt-chip {
-  border: 1px solid #c8dfd7;
-  color: #156f5b;
-  background: #f4fbf8;
+  border: 1px solid var(--border-color-primary);
+  color: var(--text-color-primary);
+  background: var(--bg-color-secondary);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 12px;
@@ -353,7 +416,7 @@ const sendMessage = async () => {
   flex: 1;
   padding: 14px;
   overflow-y: auto;
-  background: #f8faf9;
+  background: var(--bg-color-secondary);
 }
 
 .message-item {
@@ -392,7 +455,7 @@ const sendMessage = async () => {
 .markdown-body :deep(h4) {
   margin: 8px 0;
   line-height: 1.35;
-  color: #18342e;
+  color: var(--text-color-primary);
 }
 
 .markdown-body :deep(ul),
@@ -408,8 +471,8 @@ const sendMessage = async () => {
 .markdown-body :deep(code) {
   padding: 1px 4px;
   border-radius: 4px;
-  background: #eff4f2;
-  color: #1d3e36;
+  background: var(--bg-color-secondary);
+  color: var(--text-color-primary);
   font-size: 12px;
 }
 
@@ -417,7 +480,7 @@ const sendMessage = async () => {
   margin: 8px 0;
   padding: 10px;
   border-radius: 8px;
-  background: #f1f5f4;
+  background: var(--bg-color-secondary);
   overflow-x: auto;
 }
 
@@ -427,16 +490,16 @@ const sendMessage = async () => {
 }
 
 .markdown-body :deep(a) {
-  color: #0d7b62;
+  color: var(--primary-color);
   text-decoration: underline;
 }
 
 .markdown-body :deep(blockquote) {
   margin: 8px 0;
   padding: 6px 10px;
-  border-left: 3px solid #b8d8cf;
-  color: #335a52;
-  background: #f4faf8;
+  border-left: 3px solid var(--primary-color);
+  color: var(--text-color-secondary);
+  background: var(--bg-color-secondary);
 }
 
 .markdown-body :deep(img) {
@@ -456,24 +519,24 @@ const sendMessage = async () => {
 
 .markdown-body :deep(th),
 .markdown-body :deep(td) {
-  border: 1px solid #dce9e4;
+  border: 1px solid var(--border-color-primary);
   padding: 6px;
   text-align: left;
 }
 
 .message-item.user .message-bubble {
   color: #fff;
-  background: #108e71;
+  background: var(--primary-color);
 }
 
 .message-item.assistant .message-bubble {
-  color: #1a302b;
-  background: #fff;
-  border: 1px solid #e6efec;
+  color: var(--text-color-primary);
+  background: var(--bg-color-primary);
+  border: 1px solid var(--border-color-primary);
 }
 
 .loading-bubble {
-  color: #3b6158;
+  color: var(--text-color-secondary);
 }
 
 .source-list {
@@ -483,47 +546,66 @@ const sendMessage = async () => {
   gap: 6px;
 }
 
+.agent-step-list {
+  max-width: 88%;
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-step-item {
+  border: 1px solid var(--border-color-primary);
+  border-radius: 999px;
+  background: var(--bg-color-primary);
+  color: var(--text-color-secondary);
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
 .source-item {
   display: flex;
   flex-direction: column;
   text-decoration: none;
-  border: 1px dashed #bfd6cf;
-  border-radius: 10px;
+  border: 1px dashed var(--border-color-primary);
+  border-radius: 8px;
   padding: 8px;
-  background: #f6fcf9;
+  background: var(--bg-color-secondary);
 }
 
 .source-title {
-  color: #144d3f;
+  color: var(--text-color-primary);
   font-size: 12px;
   font-weight: 600;
 }
 
 .source-meta {
-  color: #597a72;
+  color: var(--text-color-tertiary);
   font-size: 11px;
   margin-top: 2px;
 }
 
 .input-area {
-  border-top: 1px solid #edf1ef;
+  border-top: 1px solid var(--border-color-primary);
   padding: 10px;
-  background: #fff;
+  background: var(--bg-color-primary);
 }
 
 .chat-input {
   width: 100%;
-  border: 1px solid #d8e7e2;
+  border: 1px solid var(--border-color-primary);
   border-radius: 10px;
   resize: none;
   padding: 8px;
   box-sizing: border-box;
+  background: var(--bg-color-primary);
+  color: var(--text-color-primary);
   font-size: 13px;
   outline: none;
 }
 
 .chat-input:focus {
-  border-color: #0f8e70;
+  border-color: var(--primary-color);
 }
 
 .send-btn {
@@ -533,7 +615,7 @@ const sendMessage = async () => {
   border-radius: 10px;
   padding: 9px;
   color: #fff;
-  background: #0f8e70;
+  background: var(--primary-color);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
@@ -547,7 +629,7 @@ const sendMessage = async () => {
 @media (max-width: 768px) {
   .travel-ai-widget {
     right: 14px;
-    bottom: 14px;
+    bottom: 62px;
   }
 
   .dialog-mask {

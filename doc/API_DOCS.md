@@ -68,6 +68,40 @@
 - **标签 (`/tag`)**: 标签查询与热门标签
 - **文件上传 (`/upload`)**: 图片/视频上传 (通常支持本地、阿里云OSS等)
 - **通知 (`/notification`)**: 获取用户消息通知
+- **旅行助手 (`/ai/travel`)**: RAG 旅行攻略生成、流式对话、结构化行程规划
 - **后台管理 (`/admin`)**: 管理员相关操作
 
 > **注意**: 具体接口参数和路径请参考 `java-project` 下的 Controller 源码或 Swagger/OpenAPI 文档 (如果集成了的话)。
+
+---
+
+## 旅行助手模块 (`/ai/travel`)
+
+旅行助手接口当前保持公开访问，前端统一通过 `/api/ai/travel/**` 调用。
+
+### `POST /ai/travel/chat`
+
+统一流式对话接口，响应类型为 `text/event-stream`。请求体示例：
+
+```json
+{
+  "message": "帮我做一份3天成都美食路线",
+  "top_k": 5,
+  "history": [
+    { "role": "user", "content": "我想周末出发" }
+  ]
+}
+```
+
+服务端会通过 SSE 返回 Agent 步骤、工具结果、最终答案和引用笔记。事件包括：
+
+- `chunk`: 模型分块文本。
+- `step`: Agent 步骤和动作选择。
+- `tool`: 工具调用结果。
+- `refs`: 引用笔记 JSON 数组。
+- `error`: 错误文本。
+- `done`: 流式输出结束。
+
+### `POST /ai/travel/sync`
+
+同步已发布笔记到 RAG 向量库，返回本次索引文档数。适用于初始化或数据更新后的手动同步。

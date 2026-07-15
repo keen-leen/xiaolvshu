@@ -158,6 +158,10 @@ public class AdminPostController {
         post.setCommentCount(0);
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
+        post.setIsIndexed(0);
+        post.setIndexedAt(null);
+        post.setIsVectorized(0);
+        post.setVectorizedAt(null);
         
         postService.save(post);
         
@@ -231,7 +235,8 @@ public class AdminPostController {
                 }
             }
         }
-        
+
+        postService.refreshIndexProjections(post.getId());
         return AdminResult.success("笔记创建成功", Map.of("id", post.getId()));
     }
 
@@ -269,6 +274,10 @@ public class AdminPostController {
             existingPost.setViewCount(updateDTO.getViewCount());
         }
         existingPost.setUpdatedAt(LocalDateTime.now());
+        existingPost.setIsIndexed(0);
+        existingPost.setIndexedAt(null);
+        existingPost.setIsVectorized(0);
+        existingPost.setVectorizedAt(null);
         
         postService.updateById(existingPost);
         
@@ -402,7 +411,8 @@ public class AdminPostController {
                 }
             }
         }
-        
+
+        postService.refreshIndexProjections(id);
         return AdminResult.success("笔记更新成功");
     }
 
@@ -452,6 +462,7 @@ public class AdminPostController {
         
         // 删除笔记
         postService.removeById(id);
+        postService.deleteIndexProjections(id);
         
         // 更新分类的笔记数（仅非草稿时）
         if (post.getIsDraft() == null || post.getIsDraft() == 0) {
@@ -519,6 +530,7 @@ public class AdminPostController {
                     collectionService.remove(collectionWrapper);
                     
                     postService.removeById(id);
+                    postService.deleteIndexProjections(id);
                     
                     // 更新分类的笔记数（仅非草稿时）
                     if (post.getIsDraft() == null || post.getIsDraft() == 0) {
@@ -566,6 +578,10 @@ public class AdminPostController {
         
         post.setIsDraft(isDraft);
         post.setUpdatedAt(LocalDateTime.now());
+        post.setIsIndexed(0);
+        post.setIndexedAt(null);
+        post.setIsVectorized(0);
+        post.setVectorizedAt(null);
         postService.updateById(post);
         
         // 处理状态切换时的计数变化
@@ -602,6 +618,7 @@ public class AdminPostController {
             }
         }
         
+        postService.refreshIndexProjections(id);
         return AdminResult.success("状态更新成功");
     }
 

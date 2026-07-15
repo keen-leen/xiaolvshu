@@ -61,3 +61,4 @@ build/
 .env.dev
 .env.release
 .env.*
+!.env.example

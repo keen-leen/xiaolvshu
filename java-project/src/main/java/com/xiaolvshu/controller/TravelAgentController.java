@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -38,9 +39,12 @@ public class TravelAgentController {
      * 向量库数据库同步接口，将笔记数据同步到RAG模块使用的向量数据库中。适用于初始数据导入或定期更新场景。
      */
     @PostMapping("/sync")
-    public Result<String> syncVectorStore() {
-        int count = ragService.syncPostNotesToVectorStore();
-        return Result.success("RAG向量库同步完成，索引文档数: " + count);
+    public Result<String> syncVectorStore(
+            @RequestParam(defaultValue = "incremental") String mode) {
+        boolean full = "full".equalsIgnoreCase(mode);
+        int count = ragService.syncPostChunksToElasticsearch(full);
+        return Result.success("Elasticsearch " + (full ? "全量" : "增量")
+                + "同步完成，RAG索引文档数: " + count);
     }
 
     /**

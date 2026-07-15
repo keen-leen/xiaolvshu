@@ -106,6 +106,18 @@ public class Post implements Serializable {
     private LocalDateTime vectorizedAt;
 
     /**
+     * 是否已同步到 Elasticsearch 全文索引：0-未同步，1-已同步
+     */
+    @TableField("is_indexed")
+    private Integer isIndexed;
+
+    /**
+     * 最近一次全文索引同步成功时间
+     */
+    @TableField("indexed_at")
+    private LocalDateTime indexedAt;
+
+    /**
      * 热度分（非数据库字段，由推荐查询动态计算）
      * 公式：(点赞×3 + 收藏×2 + 评论×2 + MIN(浏览×0.1, 50)) / (发布小时数+2)^1.5
      */

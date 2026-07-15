@@ -438,7 +438,8 @@ onUnmounted(() => {
 
 
             <div v-else>
-                <WaterfallFlow :searchKeyword="keyword" :searchTag="selectedTag" :preloadedPosts="postResults" :type="activeTab" />
+                <WaterfallFlow :searchKeyword="keyword" :searchTag="selectedTag" :preloadedPosts="postResults"
+                    :type="activeTab" :externalLoading="loading" externalDataMode />
             </div>
         </div>
         <SearchFloatingBtn @reload="handleFloatingBtnReloadRequest" />

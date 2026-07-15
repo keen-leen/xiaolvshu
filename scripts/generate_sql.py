@@ -6,6 +6,9 @@ import sys
 
 # Constants and Helper Classes
 
+# 与后端 BCryptPasswordEncoder(12) 保持一致。该哈希对应开发种子密码 123456。
+DEFAULT_PASSWORD_BCRYPT = '$2a$12$81U/nCucOHrJRPeGpZXFRONN07x8wYndkqsZ7Hm5M6Xx3PbFr1kA6'
+
 class NotificationHelper:
     # Notification Types
     TYPES = {
@@ -377,7 +380,7 @@ class SqlGenerator:
             {'id': 3, 'username': 'admin3', 'password': '123456'}
         ]
         for admin in admins:
-            self.append_sql(f"INSERT INTO admin (id, username, password) VALUES ({admin['id']}, {self.escape(admin['username'])}, SHA2({self.escape(admin['password'])}, 256))")
+            self.append_sql(f"INSERT INTO admin (id, username, password) VALUES ({admin['id']}, {self.escape(admin['username'])}, {self.escape(DEFAULT_PASSWORD_BCRYPT)})")
 
         # 2. 生成用户
         print('生成用户SQL...')
@@ -385,7 +388,7 @@ class SqlGenerator:
         for i, user in enumerate(users):
             user['id'] = i + 1
             last_login_str = user['last_login_at'].strftime('%Y-%m-%d %H:%M:%S')
-            self.append_sql(f"INSERT INTO users (id, user_id, password, nickname, avatar, bio, location, follow_count, fans_count, like_count, is_active, last_login_at, gender, zodiac_sign, mbti, education, major, interests) VALUES ({user['id']}, {self.escape(user['user_id'])}, SHA2('{user['password']}', 256), {self.escape(user['nickname'])}, {self.escape(user['avatar'])}, {self.escape(user['bio'])}, {self.escape(user['location'])}, {user['follow_count']}, {user['fans_count']}, {user['like_count']}, {user['is_active']}, {self.escape(last_login_str)}, {self.escape(user['gender'])}, {self.escape(user['zodiac_sign'])}, {self.escape(user['mbti'])}, {self.escape(user['education'])}, {self.escape(user['major'])}, {self.escape(user['interests'])})")
+            self.append_sql(f"INSERT INTO users (id, user_id, password, nickname, avatar, bio, location, follow_count, fans_count, like_count, is_active, last_login_at, gender, zodiac_sign, mbti, education, major, interests) VALUES ({user['id']}, {self.escape(user['user_id'])}, {self.escape(DEFAULT_PASSWORD_BCRYPT)}, {self.escape(user['nickname'])}, {self.escape(user['avatar'])}, {self.escape(user['bio'])}, {self.escape(user['location'])}, {user['follow_count']}, {user['fans_count']}, {user['like_count']}, {user['is_active']}, {self.escape(last_login_str)}, {self.escape(user['gender'])}, {self.escape(user['zodiac_sign'])}, {self.escape(user['mbti'])}, {self.escape(user['education'])}, {self.escape(user['major'])}, {self.escape(user['interests'])})")
 
         # 3. 生成分类
         print('生成分类SQL...')

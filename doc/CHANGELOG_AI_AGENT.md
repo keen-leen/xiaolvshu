@@ -1,5 +1,12 @@
 # 旅行助手 Agent 变更记录
 
+## 2026-07-14 全文索引状态与服务解耦
+
+- `posts` 新增 `is_indexed/indexed_at`，全文索引不再复用向量化状态。
+- 全文索引收敛到 `SearchIndexService`，RAG 只管理 chunk、embedding 和混合召回。
+- 新增管理员接口 `POST /admin/search/sync`，只补偿待同步的全文文档。
+- 管理员 JWT 新增 `principalType=ADMIN`，旧管理员令牌需重新登录。
+
 ## 2026-05-14
 
 ### RAG 笔记切分
@@ -48,3 +55,10 @@
 - 已通过：`cd java-project && mvn clean package -DskipTests` 验证本次 RAG chunk 改造可完整重新编译打包。
 - 前端构建存在既有资源路径和 chunk size 警告，不影响本次构建结果。
 - 后端测试阶段当前没有测试源码，命令完成编译校验并成功结束。
+# 2026-07-12 Elasticsearch 统一检索迁移
+
+- 移除 PostgreSQL/pgvector，改用 Elasticsearch 8.x 统一承载笔记全文检索与 RAG dense-vector 检索。
+- 新增笔记索引和 chunk 索引；RAG 使用中文 BM25 与 cosine kNN 混合召回。
+- `/search` 与 `/posts/search` 的笔记分支改为 ES 相关性排序、过滤、分页和标签聚合，用户搜索仍保留 MySQL。
+- `/ai/travel/sync` 支持 `mode=incremental|full`，并在笔记事务提交后同步新增、修改、草稿和删除状态。
+- 新增带 SmartCN 插件的 Elasticsearch Compose 部署与迁移、回滚文档。

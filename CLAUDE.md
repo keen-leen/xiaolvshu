@@ -21,7 +21,7 @@ mvn clean package -DskipTests
 java -jar target/xiaolvshu-backend-2.0.1.jar
 ```
 
-**要求**: JDK 21, MySQL 8.0, Redis, RabbitMQ, PostgreSQL (pgvector 扩展)
+**要求**: JDK 21, MySQL 8.0, Redis, RabbitMQ, Elasticsearch 8.x (SmartCN 插件)
 
 ### 前端 (vue3-project/)
 
@@ -47,7 +47,7 @@ mysql -u root -p xiaolvshu < scripts/data.sql   # 可选: 测试数据
 
 **前端**: Vue 3 (Composition API), Vite 5, Pinia, Vue Router 4, Axios
 
-**基础设施**: MySQL 8.0, Redis (缓存/限流/分布式锁), RabbitMQ (异步消息), PostgreSQL + pgvector (向量检索), 腾讯云 COS (文件存储)
+**基础设施**: MySQL 8.0, Redis (缓存/限流/分布式锁), RabbitMQ (异步消息), Elasticsearch 8.x (全文与向量检索), 腾讯云 COS (文件存储)
 
 ### 后端分层架构
 
@@ -89,7 +89,7 @@ RabbitMQ 用于异步处理点赞: `LikeMessageConsumer` 消费点赞消息
 
 ### RAG 旅游 AI (`TravelAiService`)
 
-- 启动时自动将 MySQL `posts` 表内容同步到 PostgreSQL pgvector 向量库
+- 启动时自动将 MySQL `posts` 表内容增量同步到 Elasticsearch 全文与 RAG chunk 索引
 - 支持同步 (`chat()`) 和流式 SSE (`chatStream()`) 两种对话模式
 - `posts` 表有 `is_vectorized` 和 `vectorized_at` 字段追踪向量化状态
 - Controller: `TravelAiController`, 无需鉴权 (`/ai/travel/**`)

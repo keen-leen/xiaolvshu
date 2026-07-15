@@ -4,8 +4,6 @@ import com.xiaolvshu.entity.User;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.util.Map;
-
 /**
  * 用户上下文工具类
  * 提供统一的方式获取当前登录用户的信息

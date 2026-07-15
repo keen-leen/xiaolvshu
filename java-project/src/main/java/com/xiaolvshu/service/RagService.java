@@ -14,17 +14,12 @@ import com.xiaolvshu.mapper.PostTagMapper;
 import com.xiaolvshu.mapper.TagMapper;
 import com.xiaolvshu.mapper.UserMapper;
 
-import lombok.extern.log4j.Log4j;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -49,14 +44,10 @@ public class RagService {
     private final PostTagMapper postTagMapper;
     private final TagMapper tagMapper;
     private final UserMapper userMapper;
-    private final VectorStore ragVectorStore;
-    private final JdbcTemplate ragJdbcTemplate;
+    private final ElasticsearchRagIndexService ragIndex;
 
     @Value("${app.rag.top-k:5}")
     private int defaultTopK;
-
-    @Value("${app.rag.similarity-threshold:0.45}")
-    private double similarityThreshold;
 
     @Value("${app.rag.auto-sync-on-startup:true}")
     private boolean autoSyncOnStartup;
@@ -66,14 +57,12 @@ public class RagService {
             PostTagMapper postTagMapper,
             TagMapper tagMapper,
             UserMapper userMapper,
-            VectorStore ragVectorStore,
-            @Qualifier("ragJdbcTemplate") JdbcTemplate ragJdbcTemplate) {
+            ElasticsearchRagIndexService ragIndex) {
         this.postMapper = postMapper;
         this.postTagMapper = postTagMapper;
         this.tagMapper = tagMapper;
         this.userMapper = userMapper;
-        this.ragVectorStore = ragVectorStore;
-        this.ragJdbcTemplate = ragJdbcTemplate;
+        this.ragIndex = ragIndex;
     }
 
     /**
@@ -82,10 +71,11 @@ public class RagService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void initRagIndexOnStartup() {
-        if (!autoSyncOnStartup) {
-            return;
-        }
         try {
+            ragIndex.ensureIndex();
+            if (!autoSyncOnStartup) {
+                return;
+            }
             int count = syncPostNotesToVectorStore();
             log.info("同步笔记内容到向量库完成，向量化笔记数量: {}", count);
         } catch (Exception e) {
@@ -105,13 +95,7 @@ public class RagService {
     public CommunitySearchResult searchCommunityNotes(String query, String destination, List<String> interests, Integer topK) {
         String mergedQuery = buildSearchQuery(query, destination, interests);
         int safeTopK = topK == null ? defaultTopK : Math.max(1, Math.min(10, topK));
-        SearchRequest searchRequest = SearchRequest.builder()
-                .query(mergedQuery)
-                .topK(safeTopK)
-                .similarityThreshold(similarityThreshold)
-                .build();
-
-        List<Document> docs = ragVectorStore.similaritySearch(searchRequest);
+        List<Document> docs = ragIndex.hybridSearch(mergedQuery, safeTopK);
         CommunitySearchResult result = new CommunitySearchResult();
         result.setQuery(mergedQuery);
         result.setReferences(mapReferences(docs));
@@ -128,24 +112,45 @@ public class RagService {
     }
 
     /**
-     * 将业务库中的已发布笔记同步到 pgvector。
+     * 将业务库中的已发布笔记同步到 Elasticsearch RAG chunk 索引。
      * <p>
      * 只同步新增、未向量化或内容更新后的笔记；同一篇笔记同步前会先删除旧向量，避免重复召回。
      *
      * @return 本次写入向量库的文档 chunk 数
      */
     public int syncPostNotesToVectorStore() {
+        return syncPostChunksToElasticsearch(false);
+    }
+
+    /**
+     * 同步笔记搜索投影。
+     *
+     * @param full true 时忽略历史向量化标记，从 MySQL 全量重建当前已发布笔记
+     */
+    public int syncPostChunksToElasticsearch(boolean full) {
+        ragIndex.ensureIndex();
+        if (full) {
+            // 先将已发布笔记置为待向量化；若全量重建中途失败，下次增量同步仍能继续补偿。
+            postMapper.update(null, new LambdaUpdateWrapper<Post>()
+                    .eq(Post::getIsDraft, 0)
+                    .set(Post::getIsVectorized, 0)
+                    .set(Post::getVectorizedAt, null));
+            ragIndex.clearIndex();
+        }
         // 仅索引正式发布且有正文的笔记，草稿不进入旅行助手知识库。
-        List<Post> posts = postMapper.selectList(new LambdaQueryWrapper<Post>()
+        LambdaQueryWrapper<Post> query = new LambdaQueryWrapper<Post>()
                 .eq(Post::getIsDraft, 0)
                 .isNotNull(Post::getContent)
-                .and(wrapper -> wrapper
+                .orderByDesc(Post::getCreatedAt);
+        if (!full) {
+            query.and(wrapper -> wrapper
                         .eq(Post::getIsVectorized, 0)
                         .or()
                         .isNull(Post::getVectorizedAt)
                         .or()
-                        .apply("updated_at IS NOT NULL AND vectorized_at IS NOT NULL AND updated_at > vectorized_at"))
-                .orderByDesc(Post::getCreatedAt));
+                        .apply("updated_at IS NOT NULL AND vectorized_at IS NOT NULL AND updated_at > vectorized_at"));
+        }
+        List<Post> posts = postMapper.selectList(query);
 
         if (posts.isEmpty()) {
             return 0;
@@ -154,32 +159,55 @@ public class RagService {
         Map<Long, User> userMap = buildUserMap(posts);
         Map<Long, List<String>> tagMap = buildTagMap(posts.stream().map(Post::getId).toList());
 
-        List<Document> documents = new ArrayList<>();
+        int indexedChunks = 0;
         for (Post post : posts) {
             User author = userMap.get(post.getUserId());
             List<String> tags = tagMap.getOrDefault(post.getId(), Collections.emptyList());
-            documents.addAll(buildPostDocuments(post, author, tags));
-            // 同一 postId 先删旧向量再写新向量，保证检索结果不会包含历史版本。
-            ragJdbcTemplate.update(
-                    "DELETE FROM vector_store WHERE metadata->>'source' = 'post-note' AND metadata->>'postId' = ?",
-                    String.valueOf(post.getId()));
+            List<Document> documents = buildPostDocuments(post, author, tags);
+            ragIndex.replaceChunks(post.getId(), documents);
+            markVectorized(post.getId());
+            indexedChunks += documents.size();
         }
 
-        final int embeddingBatchSize = 10;
-        for (int i = 0; i < documents.size(); i += embeddingBatchSize) {
-            // 兼容部分 OpenAI 兼容网关的 embeddings 批量限制。
-            int end = Math.min(i + embeddingBatchSize, documents.size());
-            ragVectorStore.add(documents.subList(i, end));
+        return indexedChunks;
+    }
+
+    /** 同步单篇笔记的 RAG chunks；草稿或不存在的笔记会删除旧 chunks。 */
+    public int syncPostChunks(Long postId) {
+        ragIndex.ensureIndex();
+        Post post = postMapper.selectById(postId);
+        if (post == null || Integer.valueOf(1).equals(post.getIsDraft())
+                || post.getContent() == null || post.getContent().isBlank()) {
+            ragIndex.deleteChunks(postId);
+            if (post != null) {
+                resetVectorizedState(postId);
+            }
+            return 0;
         }
-
-        postMapper.update(
-                null,
-                new LambdaUpdateWrapper<Post>()
-                        .in(Post::getId, posts.stream().map(Post::getId).toList())
-                        .set(Post::getIsVectorized, 1)
-                        .set(Post::getVectorizedAt, LocalDateTime.now()));
-
+        User author = userMapper.selectById(post.getUserId());
+        List<String> tags = buildTagMap(List.of(postId)).getOrDefault(postId, Collections.emptyList());
+        List<Document> documents = buildPostDocuments(post, author, tags);
+        ragIndex.replaceChunks(postId, documents);
+        markVectorized(postId);
         return documents.size();
+    }
+
+    public void deletePostChunks(Long postId) {
+        ragIndex.deleteChunks(postId);
+    }
+
+    private void markVectorized(Long postId) {
+        postMapper.update(null, new LambdaUpdateWrapper<Post>()
+                .eq(Post::getId, postId)
+                .set(Post::getIsVectorized, 1)
+                .set(Post::getVectorizedAt, LocalDateTime.now()));
+    }
+
+    private void resetVectorizedState(Long postId) {
+        postMapper.update(null, new LambdaUpdateWrapper<Post>()
+                .eq(Post::getId, postId)
+                .set(Post::getIsVectorized, 0)
+                .set(Post::getVectorizedAt, null));
     }
 
     /**

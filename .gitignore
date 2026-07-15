@@ -53,5 +53,17 @@ express-project/uploads/
 
 # docker
 /docker/
+!/docker/
+/docker/*
+!/docker/dev/
+/docker/dev/*
+!/docker/dev/docker-compose.yml
+!/docker/release/
+/docker/release/*
+!/docker/release/docker-compose.yml
+!/docker/release/backend.enc.example
+!/docker/elasticsearch/
+/docker/elasticsearch/*
+!/docker/elasticsearch/Dockerfile
 
 /xiaolvshu/

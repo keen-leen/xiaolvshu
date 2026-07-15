@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -42,6 +44,8 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
     private final LikeService likeService;
     private final CollectionMapper collectionMapper;
     private final NotificationMapper notificationMapper;
+    private final SearchIndexService searchIndexService;
+    private final RagService ragService;
 
     /**
      * 创建笔记
@@ -71,6 +75,10 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
         post.setCategoryId(categoryId);
         post.setIsDraft(isDraft);
         post.setType(postType);
+        post.setIsIndexed(0);
+        post.setIndexedAt(null);
+        post.setIsVectorized(0);
+        post.setVectorizedAt(null);
         baseMapper.insert(post);
 
         Long postId = post.getId();
@@ -187,9 +195,11 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
             userMapper.updateById(user);
         }
         log.info("发布笔记成功, 笔记ID:{},用户ID:{}", post.getId(), userId);
+        scheduleIndexSync(post.getId(), false);
         return convertToResponse(post, user, category, imageUrls, postVideo, tags);
     }
 
+    @Transactional
     public PostResponse updatePost(Long postId, CreatePostRequest request) {
         Post post = baseMapper.selectById(postId);
         if (post == null) {
@@ -216,6 +226,11 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
         post.setContent(request.getContent() == null ? "" : request.getContent());
         post.setCategoryId(request.getCategoryId());
         post.setIsDraft(isDraft ? 1 : 0);
+        // 内容、标题、标签或草稿状态变化后，全文和 RAG 投影都需要独立重新同步。
+        post.setIsIndexed(0);
+        post.setIndexedAt(null);
+        post.setIsVectorized(0);
+        post.setVectorizedAt(null);
         baseMapper.updateById(post);
 
         postId = post.getId();
@@ -427,6 +442,7 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
             user.setPostCount(user.getPostCount() == null ? 1 : user.getPostCount() + 1);
             userMapper.updateById(user);
         }
+        scheduleIndexSync(post.getId(), false);
         return convertToResponse(post, user, category, images, video, tags, false, false);
     }
 
@@ -651,6 +667,7 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
             throw new BusinessException("无权删除此帖子");
         }
         baseMapper.deleteById(postId);
+        scheduleIndexSync(postId, true);
         // 非草稿时更新分类和用户的帖子数
         if (post.getIsDraft() != null && post.getIsDraft() == 0) {
             // 更新分类的帖子数
@@ -672,111 +689,50 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
     }
 
     /**
-     * 搜索帖子
+     * 在 MySQL 事务提交后刷新搜索投影，避免 ES 先成功而业务事务随后回滚。
+     * 当前同步失败会记录日志，并可由启动增量同步或手动 sync 接口补偿。
      */
-    public PageResult<PostResponse> searchPosts(String keyword, int page, int limit) {
-        Page<Post> pageParam = new Page<>(page, limit);
-        IPage<Post> result = baseMapper.selectPage(pageParam,
-            new LambdaQueryWrapper<Post>()
-                .eq(Post::getIsDraft, 0)
-                .and(wrapper -> wrapper
-                    .like(Post::getTitle, keyword)
-                    .or()
-                    .like(Post::getContent, keyword))
-                .orderByDesc(Post::getCreatedAt));
-
-        List<Post> posts = result.getRecords();
-        if (posts.isEmpty()) {
-            return PageResult.empty(page, limit);
-        }
-
-        List<Long> postIds = posts.stream().map(Post::getId).toList();
-
-        // 图片
-        Map<Long, List<String>> imageMap = postImageMapper.selectList(
-            new LambdaQueryWrapper<PostImage>()
-                .in(PostImage::getPostId, postIds))
-            .stream()
-            .collect(Collectors.groupingBy(
-                PostImage::getPostId,
-                Collectors.mapping(PostImage::getImageUrl, Collectors.toList())));
-
-        // 视频封面
-        Map<Long, PostVideo> videoMap = postVideoMapper.selectList(
-            new LambdaQueryWrapper<PostVideo>()
-                .in(PostVideo::getPostId, postIds))
-            .stream()
-            .collect(Collectors.toMap(PostVideo::getPostId, v -> v, (v1, v2) -> v1));
-
-        // 标签
-        List<PostTag> postTags = postTagMapper.selectList(
-            new LambdaQueryWrapper<PostTag>()
-                .in(PostTag::getPostId, postIds));
-        List<Integer> tagIds = postTags.stream().map(PostTag::getTagId).distinct().toList();
-        Map<Integer, Tag> tagMap = tagIds.isEmpty() ? Collections.emptyMap()
-            : tagMapper.selectBatchIds(tagIds).stream()
-                .collect(Collectors.toMap(Tag::getId, t -> t));
-        Map<Long, List<TagDTO>> postTagMap = postTags.stream()
-            .collect(Collectors.groupingBy(
-                PostTag::getPostId,
-                Collectors.mapping(pt -> {
-                    Tag tag = tagMap.get(pt.getTagId());
-                    if (tag != null) {
-                    TagDTO tagDTO = new TagDTO();
-                    tagDTO.setId(tag.getId());
-                    tagDTO.setName(tag.getName());
-                    return tagDTO;
-                    }
-                    return null;
-                }, Collectors.filtering(t -> t != null, Collectors.toList()))));
-
-        // 作者信息
-        List<Long> userIds = posts.stream().map(Post::getUserId).distinct().toList();
-        Map<Long, User> userMap = userMapper.selectBatchIds(userIds)
-            .stream()
-            .collect(Collectors.toMap(User::getId, user -> user));
-
-        // 点赞与收藏状态（当前用户）
-        final Set<Long> likedSet;
-        final Set<Long> collectedSet;
-        Long uid = UserContext.getUserId();
-        Map<Long, Integer> postLikeCountMap = likeService.getPostLikeCountMap(postIds);
-        if (uid != null) {
-            likedSet = likeMapper.selectList(
-                new LambdaQueryWrapper<Like>()
-                    .eq(Like::getUserId, uid)
-                    .eq(Like::getTargetType, 1)
-                    .in(Like::getTargetId, postIds))
-                .stream()
-                .map(Like::getTargetId)
-                .collect(Collectors.toSet());
-
-            collectedSet = collectionMapper.selectList(
-                new LambdaQueryWrapper<Collection>()
-                    .eq(Collection::getUserId, uid)
-                    .in(Collection::getPostId, postIds))
-                .stream()
-                .map(Collection::getPostId)
-                .collect(Collectors.toSet());
+    private void scheduleIndexSync(Long postId, boolean deleted) {
+        Runnable task = () -> {
+            try {
+                if (deleted) {
+                    searchIndexService.deletePost(postId);
+                } else {
+                    searchIndexService.syncPost(postId);
+                }
+            } catch (Exception e) {
+                log.error("同步笔记全文索引失败, postId={}", postId, e);
+            }
+            try {
+                if (deleted) {
+                    ragService.deletePostChunks(postId);
+                } else {
+                    ragService.syncPostChunks(postId);
+                }
+            } catch (Exception e) {
+                log.error("同步笔记 RAG chunks 失败, postId={}", postId, e);
+            }
+        };
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
         } else {
-            likedSet = Collections.emptySet();
-            collectedSet = Collections.emptySet();
+            task.run();
         }
+    }
 
-        List<PostResponse> postResponses = posts.stream()
-            .map(post -> convertToResponse(
-                post,
-                userMap.get(post.getUserId()),
-                null,
-                imageMap.get(post.getId()),
-                videoMap.get(post.getId()),
-                postTagMap.get(post.getId()),
-                likedSet.contains(post.getId()),
-                collectedSet.contains(post.getId())))
-            .peek(response -> response.setLikeCount(postLikeCountMap.getOrDefault(response.getId(), response.getLikeCount())))
-            .toList();
+    /** 供管理后台等非用户端发布流程在完成数据修改后刷新两类搜索投影。 */
+    public void refreshIndexProjections(Long postId) {
+        scheduleIndexSync(postId, false);
+    }
 
-        return new PageResult<>(postResponses, page, limit, result.getTotal());
+    /** 供管理后台在删除笔记后清理全文文档和 RAG chunks。 */
+    public void deleteIndexProjections(Long postId) {
+        scheduleIndexSync(postId, true);
     }
 
     /**

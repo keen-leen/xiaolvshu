@@ -12,13 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -38,6 +35,7 @@ public class SearchService {
     private final FollowMapper followMapper;
 
     private final PostService postService;
+    private final SearchIndexService searchIndexService;
 
     public SearchResponse search(SearchRequest request) {
         String keyword = request.getKeyword() == null ? "" : request.getKeyword();
@@ -61,7 +59,7 @@ public class SearchService {
         }
         // 全部/图文/视频
         if ("all".equals(type) || "posts".equals(type) || "videos".equals(type)) {
-            SearchResponseItem<PostResponse> postResult = searchPosts(keyword, tag, type, page, limit);
+            SearchResponseItem<PostResponse> postResult = searchPostItems(keyword, tag, type, page, limit);
             if ("all".equals(type)) {
                 response.setData(postResult.getData());
                 response.setTagStats(postResult.getTagStats());
@@ -79,184 +77,58 @@ public class SearchService {
         return response;
     }
 
-    private SearchResponseItem<PostResponse> searchPosts(String keyword, String tag, String type, int page, int limit) {
-        // 1) 构建 keyword 命中笔记集合（标题/内容/用户昵称/小旅书号/标签名）
-        Set<Long> matchedPostIdsByKeyword = null;
-        if (!keyword.isBlank()) {
-            matchedPostIdsByKeyword = new HashSet<>();
-
-            // 标题/内容
-            List<Post> titleContent = postMapper.selectList(new LambdaQueryWrapper<Post>()
-                    .eq(Post::getIsDraft, 0)
-                    .and(w -> w.like(Post::getTitle, keyword).or().like(Post::getContent, keyword))
-                    .select(Post::getId));
-            matchedPostIdsByKeyword.addAll(titleContent.stream().map(Post::getId).toList());
-
-            // 用户昵称/小旅书号
-            List<User> users = userMapper.selectList(new LambdaQueryWrapper<User>()
-                    .like(User::getNickname, keyword).or().like(User::getUserId, keyword)
-                    .select(User::getId));
-            if (!users.isEmpty()) {
-                List<Long> userIds = users.stream().map(User::getId).toList();
-                List<Post> byUsers = postMapper.selectList(new LambdaQueryWrapper<Post>()
-                        .eq(Post::getIsDraft, 0)
-                        .in(Post::getUserId, userIds)
-                        .select(Post::getId));
-                matchedPostIdsByKeyword.addAll(byUsers.stream().map(Post::getId).toList());
-            }
-
-            // 标签名称 like keyword
-            List<Tag> tagsLike = tagMapper.selectList(new LambdaQueryWrapper<Tag>()
-                    .like(Tag::getName, keyword)
-                    .select(Tag::getId));
-            if (!tagsLike.isEmpty()) {
-                List<Integer> tagIds = tagsLike.stream().map(Tag::getId).toList();
-                List<PostTag> pts = postTagMapper.selectList(new LambdaQueryWrapper<PostTag>()
-                        .in(PostTag::getTagId, tagIds)
-                        .select(PostTag::getPostId));
-                matchedPostIdsByKeyword.addAll(pts.stream().map(PostTag::getPostId).toList());
-            }
-        }
-
-        // 2) tag 精确筛选帖子集合
-        Set<Long> matchedPostIdsByTag = null;
-        if (!tag.isBlank()) {
-            Tag exact = tagMapper.selectOne(new LambdaQueryWrapper<Tag>().eq(Tag::getName, tag));
-            if (exact == null) {
-                matchedPostIdsByTag = Collections.emptySet();
-            } else {
-                List<PostTag> pts = postTagMapper.selectList(new LambdaQueryWrapper<PostTag>()
-                        .eq(PostTag::getTagId, exact.getId())
-                        .select(PostTag::getPostId));
-                matchedPostIdsByTag = new HashSet<>(pts.stream().map(PostTag::getPostId).toList());
-            }
-        }
-
-        // 3) 合并条件：keyword + tag 都有则取交集，否则取对应集合
-        Set<Long> finalPostIds = Collections.emptySet();
-        if (matchedPostIdsByKeyword != null && matchedPostIdsByTag != null) {
-            finalPostIds = new HashSet<>(matchedPostIdsByKeyword);
-            finalPostIds.retainAll(matchedPostIdsByTag);
-        } else if (matchedPostIdsByKeyword != null) {
-            finalPostIds = matchedPostIdsByKeyword;
-        } else if (matchedPostIdsByTag != null) {
-            finalPostIds = matchedPostIdsByTag;
-        }
-
-        // 4) 类型过滤
-        Integer postType = null;
-        if ("posts".equals(type)) {
-            postType = 1;
-        } else if ("videos".equals(type)) {
-            postType = 2;
-        }
-
-        // 5) 分页查询帖子
-        List<PostResponse> data;
-        long total;
-        if (finalPostIds.isEmpty()) {
-            data = Collections.emptyList();
-            total = 0;
-        } else {
-            Page<Post> pageParam = new Page<>(page, limit);
-            var result = postMapper.selectPage(pageParam, new LambdaQueryWrapper<Post>()
-                    .eq(Post::getIsDraft, 0)
-                    .in(Post::getId, finalPostIds)
-                    .eq(postType != null, Post::getType, postType)
-                    .orderByDesc(Post::getCreatedAt));
-
-            total = result.getTotal();
-            List<Post> posts = result.getRecords();
-            data = buildPostResponses(posts);
-        }
-
-        // 6) tagStats：始终基于 keyword 搜索结果（不受 tag 筛选影响）
-        List<TagStatsDTO> tagStats = keyword.isBlank() ? Collections.emptyList() : computeTagStatsForKeyword(keyword);
-
-        PaginationDTO pagination = new PaginationDTO(page, limit, total);
-        SearchResponseItem<PostResponse> resp = new SearchResponseItem<>();
-        resp.setData(data);
-        resp.setTagStats(tagStats);
-        resp.setPagination(pagination);
-        return resp;
+    /**
+     * 供 /posts/search 使用的简化帖子搜索入口。
+     * 与 /search 共用同一套 ES 检索和响应组装逻辑。
+     */
+    public PageResult<PostResponse> searchPosts(String keyword, int page, int limit) {
+        String normalizedKeyword = keyword == null ? "" : keyword;
+        SearchResponseItem<PostResponse> result = searchPostItems(normalizedKeyword, "", "all", page, limit);
+        return new PageResult<>(result.getData(), page, limit, result.getPagination().getTotal());
     }
 
-    private List<TagStatsDTO> computeTagStatsForKeyword(String keyword) {
-        // 复用 keyword 命中帖子逻辑：这里取“keyword命中帖子集合”并统计其标签
-        Set<Long> keywordPostIds = new HashSet<>();
-
-        List<Post> titleContent = postMapper.selectList(new LambdaQueryWrapper<Post>()
-                .eq(Post::getIsDraft, 0)
-                .and(w -> w.like(Post::getTitle, keyword).or().like(Post::getContent, keyword))
-                .select(Post::getId));
-        keywordPostIds.addAll(titleContent.stream().map(Post::getId).toList());
-
-        List<User> users = userMapper.selectList(new LambdaQueryWrapper<User>()
-                .like(User::getNickname, keyword)
-                .or()
-                .like(User::getUserId, keyword)
-                .select(User::getId));
-        if (!users.isEmpty()) {
-            List<Long> userIds = users.stream().map(User::getId).toList();
-            List<Post> byUsers = postMapper.selectList(new LambdaQueryWrapper<Post>()
-                    .eq(Post::getIsDraft, 0)
-                    .in(Post::getUserId, userIds)
-                    .select(Post::getId));
-            keywordPostIds.addAll(byUsers.stream().map(Post::getId).toList());
-        }
-
-        List<Tag> tagsLike = tagMapper.selectList(new LambdaQueryWrapper<Tag>()
-                .like(Tag::getName, keyword)
-                .select(Tag::getId));
-        if (!tagsLike.isEmpty()) {
-            List<Integer> tagIds = tagsLike.stream().map(Tag::getId).toList();
-            List<PostTag> pts = postTagMapper.selectList(new LambdaQueryWrapper<PostTag>()
-                    .in(PostTag::getTagId, tagIds)
-                    .select(PostTag::getPostId));
-            keywordPostIds.addAll(pts.stream().map(PostTag::getPostId).toList());
-        }
-
-        if (keywordPostIds.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<PostTag> pts = postTagMapper.selectList(new LambdaQueryWrapper<PostTag>()
-                .in(PostTag::getPostId, keywordPostIds)
-                .select(PostTag::getTagId));
-        if (pts.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        Map<Integer, Long> counts = new HashMap<>();
-        for (PostTag pt : pts) {
-            Integer tagId = pt.getTagId();
-            if (tagId == null) {
-                continue;
-            }
-            counts.put(tagId, counts.getOrDefault(tagId, 0L) + 1L);
-        }
-
-        List<Integer> tagIds = new ArrayList<>(counts.keySet());
-        Map<Integer, Tag> tagMap = tagMapper.selectBatchIds(tagIds).stream().collect(Collectors.toMap(Tag::getId, t -> t));
-
-        return counts.entrySet().stream()
-                .map(e -> {
-                    Tag tag = tagMap.get(e.getKey());
-                    if (tag == null) {
-                        return null;
-                    }
-                    TagStatsDTO dto = new TagStatsDTO();
-                    dto.setId(tag.getName());
-                    dto.setLabel(tag.getName());
-                    dto.setCount(e.getValue());
-                    return dto;
-                })
-                .filter(x -> x != null)
-                .sorted(Comparator.comparing(TagStatsDTO::getLabel))
-                .limit(10)
+    /**
+     * 检索笔记/视频，返回结果按 ES 排序，包含 tag 统计信息和分页信息。
+     */
+    private SearchResponseItem<PostResponse> searchPostItems(String keyword, String tag, String type, int page, int limit) {
+        Integer postType = switch (type) {
+            case "posts" -> 1;
+            case "videos" -> 2;
+            default -> null;
+        };
+        // 1) 调用 Elasticsearch 检索相关笔记ID
+        SearchIndexService.PostSearchResult result = searchIndexService.searchPosts(keyword, tag, postType, page, limit);
+        // 2) 根据检索结果的笔记ID列表查询数据库，获取完整笔记信息
+        List<Post> posts = result.postIds().isEmpty()
+                ? Collections.emptyList()
+                : postMapper.selectBatchIds(result.postIds());
+        Map<Long, Post> postMap = posts.stream().collect(Collectors.toMap(Post::getId, p -> p));
+        List<Post> orderedPosts = result.postIds().stream()
+                .map(postMap::get)
+                .filter(Objects::nonNull)
+                // ES 删除失败时可能短暂残留旧文档，业务库中的草稿状态必须最终兜底。
+                .filter(post -> !Integer.valueOf(1).equals(post.getIsDraft()))
                 .toList();
+
+        List<TagStatsDTO> tagStats = result.tagCounts().entrySet().stream().map(entry -> {
+            TagStatsDTO dto = new TagStatsDTO();
+            dto.setId(entry.getKey());
+            dto.setLabel(entry.getKey());
+            dto.setCount(entry.getValue());
+            return dto;
+        }).toList();
+
+        SearchResponseItem<PostResponse> response = new SearchResponseItem<>();
+        response.setData(buildPostResponses(orderedPosts));
+        response.setTagStats(tagStats);
+        response.setPagination(new PaginationDTO(page, limit, result.total()));
+        return response;
     }
 
+    /**
+     * 重要方法
+     * 构建笔记查询响应，包括作者信息、图片、视频、标签、点赞/收藏状态等
+     */
     private List<PostResponse> buildPostResponses(List<Post> posts) {
         if (posts == null || posts.isEmpty()) {
             return Collections.emptyList();

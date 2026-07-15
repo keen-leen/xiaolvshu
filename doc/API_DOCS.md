@@ -104,4 +104,16 @@
 
 ### `POST /ai/travel/sync`
 
-同步已发布笔记到 RAG 向量库，返回本次索引文档数。适用于初始化或数据更新后的手动同步。
+同步已发布笔记到 Elasticsearch RAG chunk 索引，返回本次 chunk 数。
+
+- `mode=incremental`：默认值，仅补偿未同步或更新后的笔记。
+- `mode=full`：只清空 RAG chunk 投影并从 MySQL 全量重建，不影响全文索引。
+
+### `POST /admin/search/sync`
+
+只补偿 Elasticsearch 全文索引。每次请求会根据 `is_indexed`、`indexed_at`
+和 `updated_at` 找出未同步或内容版本落后的已发布笔记并同步。
+该操作不重建 RAG chunk，不调用 embedding 模型，不修改 `is_vectorized` 和 `vectorized_at`。
+
+该接口需要在 `Authorization` 请求头中携带含 `principalType=ADMIN` 的管理员 JWT。
+旧管理员令牌需重新登录后才能调用。响应数据示例：`{"syncedCount": 12}`。

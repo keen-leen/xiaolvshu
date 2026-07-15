@@ -289,8 +289,8 @@ public class AuthService{
         }
         
         // 生成JWT令牌
-        String accessToken = jwtTokenUtil.generateAccessToken(admin.getId(), admin.getUsername());
-        String refreshToken = jwtTokenUtil.generateRefreshToken(admin.getId(), admin.getUsername());
+        String accessToken = jwtTokenUtil.generateAdminAccessToken(admin.getId(), admin.getUsername());
+        String refreshToken = jwtTokenUtil.generateAdminRefreshToken(admin.getId(), admin.getUsername());
         
         log.info("管理员登录成功 - 管理员ID: {}, 用户名: {}", admin.getId(), admin.getUsername());
         
@@ -316,4 +316,3 @@ public class AuthService{
         return BeanUtil.copyProperties(admin, AdminDTO.class);
     }
 }
-

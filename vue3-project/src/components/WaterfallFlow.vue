@@ -43,6 +43,15 @@ const props = defineProps({
     preloadedPosts: {
         type: Array,
         default: () => []
+    },
+    // 外部数据模式下，列表数据完全由父组件负责加载；空数组也表示有效结果。
+    externalDataMode: {
+        type: Boolean,
+        default: false
+    },
+    externalLoading: {
+        type: Boolean,
+        default: false
     }
 })
 
@@ -250,8 +259,11 @@ async function initContent() {
     try {
         let content = []
 
-        // 优先使用预加载的笔记数据（来自搜索页面的筛选结果）
-        if (props.preloadedPosts && props.preloadedPosts.length > 0) {
+        // 外部数据模式下，空数组也代表父组件尚在加载或搜索结果为空，子组件不能重复请求。
+        if (props.externalDataMode) {
+            content = props.preloadedPosts || []
+            hasMore.value = false
+        } else if (props.preloadedPosts && props.preloadedPosts.length > 0) {
             content = props.preloadedPosts
             hasMore.value = false // 预加载数据不支持分页，所以设置为false
         } else {
@@ -335,8 +347,8 @@ async function initContent() {
 
 // 加载更多内容
 async function loadMoreContent() {
-    // 如果使用预加载数据，不支持加载更多
-    if (props.preloadedPosts && props.preloadedPosts.length > 0) {
+    // 外部数据或预加载数据由父组件管理，子组件不自行加载更多。
+    if (props.externalDataMode || (props.preloadedPosts && props.preloadedPosts.length > 0)) {
         return
     }
 
@@ -880,7 +892,7 @@ function handleImageError(event) {
 </script>
 <template>
 
-    <SkeletonList v-if="loading" :count="8" type="image-card" layout="waterfall" image-height="random"
+    <SkeletonList v-if="loading || externalLoading" :count="8" type="image-card" layout="waterfall" image-height="random"
         :show-stats="false" :show-button="false" list-class="waterfall-layout" />
 
 

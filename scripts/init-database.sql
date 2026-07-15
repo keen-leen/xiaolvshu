@@ -67,9 +67,12 @@ CREATE TABLE IF NOT EXISTS `posts` (
   `collect_count` int(11) DEFAULT 0 COMMENT '收藏数',
   `comment_count` int(11) DEFAULT 0 COMMENT '评论数',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
   `is_draft` tinyint(1) DEFAULT 1 COMMENT '是否为草稿：1-草稿，0-已发布',
   `is_vectorized` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已向量化：0-未向量化，1-已向量化',
   `vectorized_at` timestamp NULL DEFAULT NULL COMMENT '最近一次向量化时间',
+  `is_indexed` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已建立全文索引：0-未索引，1-已索引',
+  `indexed_at` timestamp NULL DEFAULT NULL COMMENT '最近一次全文索引同步成功时间',
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_category_id` (`category_id`),
@@ -234,7 +237,7 @@ CREATE TABLE IF NOT EXISTS `audit` (
 -- 插入默认管理员账户
 -- 密码: 123456
 INSERT INTO `admin` (`username`, `password`) VALUES 
-('admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92')
+('admin', '$2a$12$81U/nCucOHrJRPeGpZXFRONN07x8wYndkqsZ7Hm5M6Xx3PbFr1kA6')
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
 -- 注意：默认数据插入请使用专门的数据生成脚本

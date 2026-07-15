@@ -5,6 +5,7 @@ import com.xiaolvshu.dto.*;
 import com.xiaolvshu.service.CollectionService;
 import com.xiaolvshu.service.CommentService;
 import com.xiaolvshu.service.PostService;
+import com.xiaolvshu.service.SearchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class PostController {
     
     private final PostService postService;
+    private final SearchService searchService;
     private final CommentService commentService;
     private final CollectionService collectionService;
     
@@ -97,7 +99,8 @@ public class PostController {
             return Result.error("请输入搜索关键词");
         }
         log.info("搜索笔记 - 关键词: {}, 页码: {}, 每页: {}", request.getKeyword(), request.getPage(), request.getLimit());
-        PageResult<PostResponse> posts = postService.searchPosts(request.getKeyword(), request.getPage(), request.getLimit());
+        PageResult<PostResponse> posts = searchService.searchPosts(
+                request.getKeyword(), request.getPage(), request.getLimit());
         return Result.success(posts);
     }
     

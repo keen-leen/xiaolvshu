@@ -14,7 +14,7 @@
 
 ### 后端
 - **Java**: Spring Boot 3.3.5, MyBatis-Plus 3.5.7
-- **数据库**: MySQL 8.0
+- **数据库与搜索**: MySQL 8.0、Elasticsearch 8.x（全文检索与 RAG 向量检索）
 - **缓存/工具**: Hutool, JWT
 
 ### 前端
@@ -33,5 +33,4 @@
     - 将项目名称重品牌化为 "小旅书 (Xiaolvshu)"。
     - 使用Java后端替换原express后端。
     - 调整了部分业务逻辑以适应新的需求。
-
 

@@ -18,6 +18,9 @@ import java.util.Map;
  */
 @Component
 public class JwtTokenUtil {
+
+    public static final String PRINCIPAL_TYPE_USER = "USER";
+    public static final String PRINCIPAL_TYPE_ADMIN = "ADMIN";
     
     @Value("${app.jwt.secret}")
     private String secret;
@@ -37,10 +40,20 @@ public class JwtTokenUtil {
      * 生成访问令牌（Access Token）
      */
     public String generateAccessToken(Long userId, String username) {
+        return generateAccessToken(userId, username, PRINCIPAL_TYPE_USER);
+    }
+
+    /** 生成可被 Spring Security 识别为管理员的访问令牌。 */
+    public String generateAdminAccessToken(Long adminId, String username) {
+        return generateAccessToken(adminId, username, PRINCIPAL_TYPE_ADMIN);
+    }
+
+    private String generateAccessToken(Long userId, String username, String principalType) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
         claims.put("type", "access");
+        claims.put("principalType", principalType);
         
         return Jwts.builder()
                 .setClaims(claims)
@@ -55,10 +68,19 @@ public class JwtTokenUtil {
      * 生成刷新令牌（Refresh Token）
      */
     public String generateRefreshToken(Long userId, String username) {
+        return generateRefreshToken(userId, username, PRINCIPAL_TYPE_USER);
+    }
+
+    public String generateAdminRefreshToken(Long adminId, String username) {
+        return generateRefreshToken(adminId, username, PRINCIPAL_TYPE_ADMIN);
+    }
+
+    private String generateRefreshToken(Long userId, String username, String principalType) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
         claims.put("type", "refresh");
+        claims.put("principalType", principalType);
         
         return Jwts.builder()
                 .setClaims(claims)
@@ -96,6 +118,20 @@ public class JwtTokenUtil {
     public Long getUserIdFromToken(String token) {
         Claims claims = getClaimsFromToken(token);
         return claims.get("userId", Long.class);
+    }
+
+    /**
+     * 获取令牌主体类型。兼容旧令牌：没有 principalType 时按普通用户处理，
+     * 避免旧令牌意外获得管理员权限。
+     */
+    public String getPrincipalTypeFromToken(String token) {
+        String principalType = getClaimsFromToken(token).get("principalType", String.class);
+        return principalType == null ? PRINCIPAL_TYPE_USER : principalType;
+    }
+
+    /** 只有 type=access 的令牌可用于接口认证，刷新令牌不能当作 Bearer 令牌。 */
+    public boolean isAccessToken(String token) {
+        return "access".equals(getClaimsFromToken(token).get("type", String.class));
     }
     
     /**

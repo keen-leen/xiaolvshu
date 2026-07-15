@@ -2,7 +2,7 @@
 
 ## 项目结构与模块组织
 
-本仓库是小旅书旅游交流社区应用。后端位于 `java-project/`，使用 Java 21、Spring Boot 3.3.5、MyBatis-Plus、JWT、Redis、RabbitMQ、MySQL 和 PostgreSQL/pgvector。后端源码在 `java-project/src/main/java/com/xiaolvshu/`，按 `controller/`、`service/`、`mapper/`、`entity/`、`dto/`、`config/`、`utils/` 分层组织；运行配置位于 `java-project/src/main/resources/`。
+本仓库是小旅书旅游交流社区应用。后端位于 `java-project/`，使用 Java 21、Spring Boot 3.3.5、MyBatis-Plus、JWT、Redis、RabbitMQ、MySQL 和 Elasticsearch 8.x（全文与向量检索）。后端源码在 `java-project/src/main/java/com/xiaolvshu/`，按 `controller/`、`service/`、`mapper/`、`entity/`、`dto/`、`config/`、`utils/` 分层组织；运行配置位于 `java-project/src/main/resources/`。
 
 前端位于 `vue3-project/`，是 Vue 3 + Vite 应用。源码在 `vue3-project/src/`，包括 `api/`、`components/`、`views/`、`stores/`、`router/`、`utils/`、`composables/` 和 `assets/`。数据库初始化与辅助脚本在 `scripts/`，项目文档在 `doc/`。
 
@@ -32,4 +32,4 @@
 
 ## 安全与配置提示
 
-不要提交真实密钥。前端环境变量以 `vue3-project/.env.example` 为模板；后端凭据应保存在本地或部署环境专用的 Spring 配置中。本地开发需要 MySQL 8、Redis、RabbitMQ、带 pgvector 的 PostgreSQL，以及 JDK 21。
+不要提交真实密钥。前端环境变量以 `vue3-project/.env.example` 为模板；后端凭据应保存在本地或部署环境专用的 Spring 配置中。本地开发需要 MySQL 8、Redis、RabbitMQ、带 SmartCN 插件的 Elasticsearch 8.x，以及 JDK 21。

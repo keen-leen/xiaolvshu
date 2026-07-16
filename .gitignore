@@ -29,6 +29,9 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+.agents
+.codex
+.github
 
 # Environment variables
 .env
@@ -55,3 +58,6 @@ express-project/uploads/
 # code agent
 AGENTS.md
 CLAUDE.md
+
+# doc
+doc/*_PLAN.md

@@ -1,36 +1,71 @@
-# 小旅书 (Xiaolvshu)
+# 小旅书（Xiaolvshu）
 
-小旅书是一款专注于旅游交流的社区应用，旨在为旅行爱好者提供一个分享旅行见闻、攻略和心得的平台。
-
-## 项目简介
-
-小旅书致力于打造一个纯粹的旅游分享社区，用户可以：
-- 发布图文/视频游记
-- 浏览热门旅游目的地攻略
-- 关注感兴趣的旅行博主
-- 互动交流（点赞、评论、收藏）
+小旅书是一个旅游内容社区，支持图文/视频游记、用户关系、互动通知、全文搜索、RAG 检索和旅行规划助手。
 
 ## 技术栈
 
-### 后端
-- **Java**: Spring Boot 3.3.5, MyBatis-Plus 3.5.7
-- **数据库与搜索**: MySQL 8.0、Elasticsearch 8.x（全文检索与 RAG 向量检索）
-- **缓存/工具**: Hutool, JWT
+- 后端：Java 21、Spring Boot 3.3.5、MyBatis-Plus、JWT
+- 前端：Vue 3、Vite、Pinia、Vue Router、Vant、Element Plus
+- 数据与基础设施：MySQL 8、Redis 7、RabbitMQ、Elasticsearch 8.x
 
-### 前端
-- **Vue 3**: Vite, Pinia, Vue Router
-- **UI**: Vant UI / Element Plus
+## 快速开始
 
-## 许可证
+准备 Docker、Docker Compose、JDK 21、Maven 和 Node.js，然后创建本地配置：
 
-本项目基于 [GNU Affero General Public License v3 (AGPLv3)](LICENSE) 许可证开源。
+```bash
+cp docker/dev/.env.example docker/dev/.env
+cp java-project/.env.example java-project/.env.dev
+cp vue3-project/.env.example vue3-project/.env
+```
 
-## 致谢与来源
+编辑上述文件，将占位值替换为本地开发凭据。真实密钥不得提交到仓库。
 
-本项目修改自开源项目 **小石榴 (Xiaoshiliu) https://github.com/ZTMYO/XiaoShiLiu**
-- 感谢原作者的开源。
-- 本项目在原项目基础上进行了重构与功能扩展，主要修改包括：
-    - 将项目名称重品牌化为 "小旅书 (Xiaolvshu)"。
-    - 使用Java后端替换原express后端。
-    - 调整了部分业务逻辑以适应新的需求。
+启动基础设施：
 
+```bash
+docker compose -f docker/dev/docker-compose.yml up -d --build
+```
+
+启动后端：
+
+```bash
+cd java-project
+./scripts/start-dev.sh
+```
+
+启动前端：
+
+```bash
+cd vue3-project
+npm install
+npm run dev
+```
+
+默认地址：
+
+- 前端：`http://localhost:5173`
+- 后端 API：`http://localhost:8080/api`
+- RabbitMQ 管理界面：`http://localhost:25672`
+- Elasticsearch：`http://localhost:19200`
+
+完整环境说明见 [开发指南](doc/DEVELOPMENT.md)。
+
+## 文档
+
+- [总体架构](doc/ARCHITECTURE.md)
+- [开发指南](doc/DEVELOPMENT.md)
+- [API 概览](doc/API.md)
+- [数据库设计](doc/DATABASE.md)
+- [社区功能](doc/COMMUNITY.md)
+- [搜索与 RAG](doc/SEARCH_RAG.md)
+- [旅行规划 Agent](doc/TRAVEL_AGENT.md)
+- [后台管理](doc/ADMIN.md)
+- [Redis 模块](doc/REDIS.md)
+- [重大变更记录](doc/CHANGE_LOG.md)
+
+文档维护约定见 [doc/README.md](doc/README.md)。
+
+## 许可证与来源
+
+本项目基于 [GNU Affero General Public License v3](LICENSE) 开源，修改自
+[小石榴（XiaoShiLiu）](https://github.com/ZTMYO/XiaoShiLiu)。本项目已使用 Java 后端替换原 Express 后端，并围绕旅游社区、搜索和 AI 能力持续扩展。

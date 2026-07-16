@@ -15,15 +15,15 @@ set -a
 source "$ENV_FILE"
 set +a
 
-export SPRING_PROFILES_ACTIVE=dev
-
 required_vars=(
   DB_PASSWORD
   RABBITMQ_PASSWORD
   JWT_SECRET
   ELASTICSEARCH_PASSWORD
+  AI_API_KEY
   COS_SECRET_ID
   COS_SECRET_KEY
+  COS_BUCKET_NAME
 )
 
 for var_name in "${required_vars[@]}"; do

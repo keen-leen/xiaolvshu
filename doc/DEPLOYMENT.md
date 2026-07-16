@@ -15,26 +15,27 @@
 
 ## 本地开发运行
 
-### 1. 数据库准备
+### 1. 开发基础设施
 
-1. 创建数据库 `xiaolvshu`。
-2. 运行 `scripts/init-database.sql` 初始化表结构。
-3. (可选) 运行 `scripts/data.sql` 导入测试数据。
-4. 修改配置文件 `java-project/src/main/resources/application.yml`:
-   ```yaml
-   spring:
-     datasource:
-       url: jdbc:mysql://localhost:3306/xiaolvshu
-       username: root
-       password: your_password
-   ```
+```bash
+cp docker/dev/.env.example docker/dev/.env
+docker compose -f docker/dev/docker-compose.yml up -d --build
+```
+
+Compose 会启动 MySQL、Redis、RabbitMQ 和 Elasticsearch。全新 MySQL
+数据卷会依次导入 `docker/dev/mysql/init/schema.sql` 与 `data.sql`。
+
+复制后端环境变量示例并填写本地真实密钥：
+
+```bash
+cp java-project/.env.example java-project/.env.dev
+```
 
 ### 2. 后端启动 (Spring Boot)
 
 ```bash
 cd java-project
-# 使用 Maven 编译并运行
-mvn spring-boot:run
+./scripts/start-dev.sh
 ```
 服务默认启动在端口 `8080`。
 

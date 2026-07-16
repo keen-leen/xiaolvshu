@@ -102,13 +102,6 @@
 - `error`: 错误文本。
 - `done`: 流式输出结束。
 
-### `POST /ai/travel/sync`
-
-同步已发布笔记到 Elasticsearch RAG chunk 索引，返回本次 chunk 数。
-
-- `mode=incremental`：默认值，仅补偿未同步或更新后的笔记。
-- `mode=full`：只清空 RAG chunk 投影并从 MySQL 全量重建，不影响全文索引。
-
 ### `POST /admin/search/sync`
 
 只补偿 Elasticsearch 全文索引。每次请求会根据 `is_indexed`、`indexed_at`
@@ -117,3 +110,10 @@
 
 该接口需要在 `Authorization` 请求头中携带含 `principalType=ADMIN` 的管理员 JWT。
 旧管理员令牌需重新登录后才能调用。响应数据示例：`{"syncedCount": 12}`。
+
+### `POST /admin/rag/sync`
+
+增量生成 Elasticsearch RAG chunk 向量。每次请求只处理未向量化或内容版本
+晚于 `vectorized_at` 的已发布笔记，不提供全量清空和重建模式。
+
+该接口需要管理员 JWT，响应数据示例：`{"indexedChunkCount": 24}`。

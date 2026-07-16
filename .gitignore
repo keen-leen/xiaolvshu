@@ -47,10 +47,6 @@ Thumbs.db
 # uploads
 express-project/uploads/
 
-# private_config
-/java-project/src/main/resources/application-release.yml
-
-
 # docker
 /docker/**/.env
 

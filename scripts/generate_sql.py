@@ -134,7 +134,15 @@ class NotificationHelper:
 class SqlGenerator:
     def __init__(self):
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.output_file = os.path.join(self.base_dir, 'data.sql')
+        self.output_file = os.path.abspath(os.path.join(
+            self.base_dir,
+            '..',
+            'docker',
+            'dev',
+            'mysql',
+            'init',
+            'data.sql'
+        ))
         self.avatar_links = self.load_links_from_file('imgLinks/avatar_link.txt')
         self.image_links = self.load_links_from_file('imgLinks/post_img_link.txt')
 

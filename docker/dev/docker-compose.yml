@@ -4,27 +4,22 @@ services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
-
     ports:
       - "127.0.0.1:${MYSQL_PORT:-13306}:3306"
-
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in docker/dev/.env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-xiaolvshu}
+      MYSQL_USER: ${MYSQL_USER:-xiaolvshu}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in docker/dev/.env}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-time-zone=+08:00
-
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./mysql/init/xiaolvshu.sql:/docker-entrypoint-initdb.d/01-xiaolvshu.sql:ro
+      - ./mysql/init/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./mysql/init/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
-
     healthcheck:
       test:
         [
@@ -35,97 +30,73 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-
     networks:
       - backend
-
 
   redis:
     image: redis:7
     restart: unless-stopped
-
     ports:
       - "127.0.0.1:${REDIS_PORT:-16379}:6379"
-
     command:
       - redis-server
       - --appendonly
       - "yes"
       - --appendfsync
       - everysec
-
     volumes:
       - redis_data:/data
-
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 10
       start_period: 5s
-
     networks:
       - backend
-
 
   rabbitmq:
     image: rabbitmq:3-management
     restart: unless-stopped
-
     ports:
-      # AMQP 客户端连接
-      - "127.0.0.1:${RABBITMQ_AMQP_PORT}:5672"
-
-      # RabbitMQ 管理后台
-      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT}:15672"
-
+      - "127.0.0.1:${RABBITMQ_AMQP_PORT:-15672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-25672}:15672"
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-xiaolvshu}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD must be set in docker/dev/.env}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
-
-
     networks:
       - backend
-
 
   elasticsearch:
     build:
       context: ../..
-      dockerfile: docker/dev/elasticsearch/Dockerfile
-
+      dockerfile_inline: |
+        FROM docker.elastic.co/elasticsearch/elasticsearch:8.19.6
+        RUN bin/elasticsearch-plugin install --batch analysis-smartcn
     restart: unless-stopped
-
     ports:
-      - "127.0.0.1:${ELASTICSEARCH_PORT}:9200"
-
+      - "127.0.0.1:${ELASTICSEARCH_PORT:-19200}:9200"
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-
       discovery.type: single-node
       cluster.name: xiaolvshu-dev
       node.name: xiaolvshu-dev-node
-
       xpack.security.enabled: "true"
-      ELASTIC_PASSWORD: ${ELASTICSEARCH_PASSWORD}
-
+      ELASTIC_PASSWORD: ${ELASTICSEARCH_PASSWORD:?ELASTICSEARCH_PASSWORD must be set in docker/dev/.env}
       ES_JAVA_OPTS: >-
         -Xms${ELASTICSEARCH_HEAP:-1g}
         -Xmx${ELASTICSEARCH_HEAP:-1g}
-
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
-
     healthcheck:
       test:
         [
@@ -136,29 +107,22 @@ services:
       timeout: 5s
       retries: 30
       start_period: 60s
-
     ulimits:
       memlock:
         soft: -1
         hard: -1
-
     networks:
       - backend
-
 
 volumes:
   mysql_data:
     name: xiaolvshu_mysql_data
-
   redis_data:
     name: xiaolvshu_redis_data
-
   rabbitmq_data:
     name: xiaolvshu_rabbitmq_data
-
   elasticsearch_data:
     name: xiaolvshu_elasticsearch_data
-
 
 networks:
   backend:

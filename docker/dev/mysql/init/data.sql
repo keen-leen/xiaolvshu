@@ -1,5 +1,6 @@
 -- 小旅书 模拟数据 SQL 脚本;
 SET NAMES utf8mb4;
+USE `xiaolvshu`;
 TRUNCATE TABLE user_sessions;
 TRUNCATE TABLE notifications;
 TRUNCATE TABLE comments;

@@ -35,7 +35,8 @@ export RAG_NUM_CANDIDATES=100
 ## 首次迁移
 
 1. 启动 Elasticsearch，确认集群健康。
-2. 先执行 `scripts/add-post-index-status.sql`，再启动后端；全文和 RAG 服务会分别初始化、增量同步各自的索引。
+2. 全新开发库已在 `docker/dev/mysql/init/schema.sql` 中包含全文与 RAG
+   索引状态字段，无需再执行独立补丁。应用启动时不会自动创建或同步全文与 RAG 索引。
 3. 使用管理员 JWT 补齐全文索引：
 
 ```bash
@@ -43,24 +44,25 @@ curl -X POST 'http://localhost:8080/api/admin/search/sync' \
   -H 'Authorization: Bearer <admin-access-token>'
 ```
 
-4. 从 MySQL 全量重建 RAG chunk：
+4. 使用管理员 JWT 增量生成 RAG chunk：
 
 ```bash
-curl -X POST 'http://localhost:8080/api/ai/travel/sync?mode=full'
+curl -X POST 'http://localhost:8080/api/admin/rag/sync' \
+  -H 'Authorization: Bearer <admin-access-token>'
 ```
 
 5. 验证 `/api/search`、`/api/posts/search` 和旅行助手引用结果。
 6. 保留 pgvector 一个观察期；确认没有回滚需求后再停止并删除 PostgreSQL 实例。
 
-RAG 全量同步只会清空 chunk 投影，不会影响全文索引。若中途失败，
-成功项会单独标记，未完成项可在修复 embedding 或 ES 连接后通过增量同步继续补偿。
+成功项会单独标记，未完成项可在修复 embedding 或 ES 连接后再次增量同步。
 
 ## 日常同步与补偿
 
 发布、修改、转草稿和删除笔记会在 MySQL 事务提交后更新 ES。失败只记录错误，避免搜索基础设施故障回滚业务事务；可通过下列接口补偿：
 
 ```bash
-curl -X POST 'http://localhost:8080/api/ai/travel/sync?mode=incremental'
+curl -X POST 'http://localhost:8080/api/admin/rag/sync' \
+  -H 'Authorization: Bearer <admin-access-token>'
 ```
 
 全文索引可由管理员单独补偿：
@@ -71,7 +73,7 @@ curl -X POST 'http://localhost:8080/api/admin/search/sync' \
 ```
 
 `is_indexed/indexed_at` 记录全文索引状态，`is_vectorized/vectorized_at` 记录 RAG chunk 状态。
-两类索引均可独立从 MySQL 重建。
+两类索引均可独立从 MySQL 补偿同步。
 
 ## 回滚
 

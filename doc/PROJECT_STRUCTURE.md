@@ -37,8 +37,7 @@ java-project/
 │       │   └── XiaolvshuApplication.java # 启动类
 │       └── resources/
 │           ├── mapper/           # MyBatis XML 映射文件 (如有)
-│           ├── application.yml   # 主配置文件
-│           └── application-dev.yaml # 开发环境配置
+│           └── application.yml   # 统一配置，由环境变量区分运行环境
 ├── Dockerfile                    # 后端 Docker 构建文件
 ├── pom.xml                       # Maven 依赖配置
 └── target/                       # 编译输出目录
@@ -74,12 +73,14 @@ vue3-project/
 └── nginx.conf              # Nginx 部署配置
 ```
 
-## 数据库与脚本 (scripts/)
+## 数据库与脚本
 
 ```
+docker/dev/mysql/init/
+├── schema.sql              # 开发数据库完整结构
+└── data.sql                # 开发模拟数据
+
 scripts/
-├── init-database.sql       # 数据库初始化 SQL (建表语句)
-├── data.sql                # 初始数据/演示数据
 ├── generate_sql.py         # SQL 生成脚本
 └── imgLinks/               # 图片链接资源
 ```

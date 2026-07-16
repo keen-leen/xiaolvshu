@@ -48,22 +48,14 @@ Thumbs.db
 express-project/uploads/
 
 # private_config
-/java-project/src/main/resources/application-*.yml
-/java-project/src/main/resources/application-*.yaml
+/java-project/src/main/resources/application-release.yml
+
 
 # docker
-/docker/
-!/docker/
-/docker/*
-!/docker/dev/
-/docker/dev/*
-!/docker/dev/docker-compose.yml
-!/docker/release/
-/docker/release/*
-!/docker/release/docker-compose.yml
-!/docker/release/backend.enc.example
-!/docker/elasticsearch/
-/docker/elasticsearch/*
-!/docker/elasticsearch/Dockerfile
+/docker/**/.env
 
 /xiaolvshu/
+
+# code agent
+AGENTS.md
+CLAUDE.md

@@ -690,7 +690,7 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
 
     /**
      * 在 MySQL 事务提交后刷新搜索投影，避免 ES 先成功而业务事务随后回滚。
-     * 当前同步失败会记录日志，并可由启动增量同步或手动 sync 接口补偿。
+     * 当前同步失败会记录日志，并可由管理员手动同步接口补偿。
      */
     private void scheduleIndexSync(Long postId, boolean deleted) {
         Runnable task = () -> {

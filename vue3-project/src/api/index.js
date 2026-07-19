@@ -395,6 +395,15 @@ export const adminApi = {
     return request.post('/auth/admin/logout')
   },
 
+  // ========== 索引管理 ==========
+  syncSearchIndex() {
+    return request.post('/admin/search/sync')
+  },
+
+  syncRagIndex() {
+    return request.post('/admin/rag/sync')
+  },
+
   // ========== 用户管理 ==========
   // 获取用户列表
   getUsers(params = {}) {

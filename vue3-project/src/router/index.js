@@ -32,6 +32,7 @@ import NotificationManagement from '@/views/admin/NotificationManagement.vue'
 import SessionManagement from '@/views/admin/SessionManagement.vue'
 import AdminManagement from '@/views/admin/AdminManagement.vue'
 import AuditManagement from '@/views/admin/AuditManagement.vue'
+import SearchIndexManagement from '@/views/admin/SearchIndexManagement.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -195,6 +196,11 @@ const router = createRouter({
           path: 'monitor',
           name: 'admin_monitor',
           component: AdminMonitor
+        },
+        {
+          path: 'search-index',
+          name: 'admin_search_index',
+          component: SearchIndexManagement
         },
         {
           path: 'users',

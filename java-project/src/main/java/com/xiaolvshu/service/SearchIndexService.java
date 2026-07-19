@@ -18,10 +18,7 @@ import com.xiaolvshu.mapper.PostTagMapper;
 import com.xiaolvshu.mapper.TagMapper;
 import com.xiaolvshu.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -43,7 +40,6 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class SearchIndexService {
 
     private final ElasticsearchClient client;
@@ -54,9 +50,6 @@ public class SearchIndexService {
 
     @Value("${app.search.index-prefix:xiaolvshu}")
     private String indexPrefix;
-
-    @Value("${app.search.auto-sync-on-startup:false}")
-    private boolean autoSyncOnStartup;
 
     public String postIndex() {
         return indexPrefix + "_posts_v1";
@@ -85,22 +78,6 @@ public class SearchIndexService {
                         .properties("createdAt", p -> p.date(v -> v))));
         } catch (IOException e) {
             throw new IllegalStateException("初始化 Elasticsearch 全文索引失败", e);
-        }
-    }
-
-    /** 
-     * 应用启动后补偿未同步的全文索引，失败不阻断主应用启动。 
-    */
-    @EventListener(ApplicationReadyEvent.class)
-    public void initSearchIndexOnStartup() {
-        try {
-            ensureIndex();
-            if (autoSyncOnStartup) {
-                int count = syncPendingPosts();
-                log.info("启动时全文索引增量同步完成，文档数: {}", count);
-            }
-        } catch (Exception e) {
-            log.warn("启动时同步全文索引失败: {}", e.getMessage());
         }
     }
 

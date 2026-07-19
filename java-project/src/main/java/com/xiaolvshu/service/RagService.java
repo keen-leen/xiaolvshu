@@ -14,16 +14,13 @@ import com.xiaolvshu.mapper.PostTagMapper;
 import com.xiaolvshu.mapper.TagMapper;
 import com.xiaolvshu.mapper.UserMapper;
 
-import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -32,7 +29,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
-@Slf4j
 public class RagService {
 
     private static final int SHORT_CONTENT_LIMIT = 800;
@@ -44,20 +40,17 @@ public class RagService {
     private final PostTagMapper postTagMapper;
     private final TagMapper tagMapper;
     private final UserMapper userMapper;
-    private final ElasticsearchRagIndexService ragIndex;
+    private final RagIndexService ragIndex;
 
     @Value("${app.rag.top-k:5}")
     private int defaultTopK;
-
-    @Value("${app.rag.auto-sync-on-startup:true}")
-    private boolean autoSyncOnStartup;
 
     public RagService(
             PostMapper postMapper,
             PostTagMapper postTagMapper,
             TagMapper tagMapper,
             UserMapper userMapper,
-            ElasticsearchRagIndexService ragIndex) {
+            RagIndexService ragIndex) {
         this.postMapper = postMapper;
         this.postTagMapper = postTagMapper;
         this.tagMapper = tagMapper;
@@ -66,33 +59,16 @@ public class RagService {
     }
 
     /**
-     * 应用启动后自动同步社区笔记到向量库。
-     * 这里失败只记录日志，不阻断主应用启动；运行期仍可通过 `/ai/travel/sync` 手动补偿同步。
-     */
-    @EventListener(ApplicationReadyEvent.class)
-    public void initRagIndexOnStartup() {
-        try {
-            ragIndex.ensureIndex();
-            if (!autoSyncOnStartup) {
-                return;
-            }
-            int count = syncPostNotesToVectorStore();
-            log.info("同步笔记内容到向量库完成，向量化笔记数量: {}", count);
-        } catch (Exception e) {
-            log.warn("同步向量库失败: {}", e.getMessage());
-        }
-    }
-
-    /**
      * 检索社区笔记并转换为 Agent 工具结果。
      *
-     * @param query 用户原始问题
+     * @param query       用户原始问题
      * @param destination 可选目的地，用于增强检索 query
-     * @param interests 可选兴趣标签，用于增强检索 query
-     * @param topK 召回数量，限制在 1 到 10
+     * @param interests   可选兴趣标签，用于增强检索 query
+     * @param topK        召回数量，限制在 1 到 10
      * @return 包含上下文文本和引用笔记的检索结果
      */
-    public CommunitySearchResult searchCommunityNotes(String query, String destination, List<String> interests, Integer topK) {
+    public CommunitySearchResult searchCommunityNotes(String query, String destination, List<String> interests,
+            Integer topK) {
         String mergedQuery = buildSearchQuery(query, destination, interests);
         int safeTopK = topK == null ? defaultTopK : Math.max(1, Math.min(10, topK));
         List<Document> docs = ragIndex.hybridSearch(mergedQuery, safeTopK);
@@ -123,7 +99,7 @@ public class RagService {
     }
 
     /**
-     * 同步笔记搜索投影。
+     * 同步笔记搜索chunk向量化索引，支持全量重建。
      *
      * @param full true 时忽略历史向量化标记，从 MySQL 全量重建当前已发布笔记
      */
@@ -144,11 +120,11 @@ public class RagService {
                 .orderByDesc(Post::getCreatedAt);
         if (!full) {
             query.and(wrapper -> wrapper
-                        .eq(Post::getIsVectorized, 0)
-                        .or()
-                        .isNull(Post::getVectorizedAt)
-                        .or()
-                        .apply("updated_at IS NOT NULL AND vectorized_at IS NOT NULL AND updated_at > vectorized_at"));
+                    .eq(Post::getIsVectorized, 0)
+                    .or()
+                    .isNull(Post::getVectorizedAt)
+                    .or()
+                    .apply("updated_at IS NOT NULL AND vectorized_at IS NOT NULL AND updated_at > vectorized_at"));
         }
         List<Post> posts = postMapper.selectList(query);
 
@@ -240,7 +216,15 @@ public class RagService {
             if (doc == null || doc.getText() == null || doc.getText().isBlank()) {
                 continue;
             }
-            builder.append(doc.getText().trim()).append("\n\n");
+            String title = asString(doc.getMetadata().get("title")).trim();
+            List<String> tags = parseTags(doc.getMetadata().get("tags"));
+            if (!title.isBlank()) {
+                builder.append("标题: ").append(title).append('\n');
+            }
+            if (!tags.isEmpty()) {
+                builder.append("标签: ").append(String.join("、", tags)).append('\n');
+            }
+            builder.append("片段: ").append(doc.getText().trim()).append("\n\n");
         }
         return builder.isEmpty() ? "未检索到相关笔记" : builder.toString();
     }
@@ -280,7 +264,6 @@ public class RagService {
         List<String> chunks = splitPostContent(post.getContent());
         List<Document> documents = new ArrayList<>();
         String authorName = author == null ? "匿名用户" : safe(author.getNickname());
-        String tagText = tags == null || tags.isEmpty() ? "无" : String.join("、", tags);
 
         for (int i = 0; i < chunks.size(); i++) {
             String chunk = chunks.get(i);
@@ -291,17 +274,14 @@ public class RagService {
             metadata.put("author", authorName);
             metadata.put("summary", truncate(chunk, 180));
             metadata.put("link", "/post?id=" + post.getId());
-            metadata.put("tags", tags == null ? "" : String.join(",", tags));
+            // Elasticsearch keyword 字段原生支持数组，保留标签边界才能正确执行精确匹配。
+            metadata.put("tags", tags == null ? List.of() : List.copyOf(tags));
             metadata.put("chunkIndex", i);
             metadata.put("chunkCount", chunks.size());
             metadata.put("chunkType", "content");
 
-            String content = "标题: " + safe(post.getTitle()) + "\n"
-                    + "作者: " + authorName + "\n"
-                    + "标签: " + tagText + "\n"
-                    + "片段: " + safe(chunk);
-
-            documents.add(new Document(content, metadata));
+            // Document 只保存原始正文 chunk；标题和标签仅在生成 embedding 时临时组合。
+            documents.add(new Document(safe(chunk), metadata));
         }
         return documents;
     }
@@ -466,17 +446,21 @@ public class RagService {
     }
 
     private List<String> parseTags(Object value) {
-        if (value == null || value.toString().isBlank()) {
+        if (value == null) {
             return Collections.emptyList();
         }
-        String[] parts = value.toString().split(",");
-        List<String> tags = new ArrayList<>();
-        for (String part : parts) {
-            if (!part.isBlank()) {
-                tags.add(part.trim());
+
+        // tags 使用 keyword 数组，ES 客户端会将其反序列化为 Collection。
+        if (value instanceof Collection<?> values) {
+            List<String> tags = new ArrayList<>();
+            for (Object item : values) {
+                if (item != null && !item.toString().isBlank()) {
+                    tags.add(item.toString().trim());
+                }
             }
+            return tags;
         }
-        return tags;
+        return Collections.emptyList();
     }
 
     private String safe(String text) {

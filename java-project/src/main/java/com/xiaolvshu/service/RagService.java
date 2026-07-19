@@ -136,15 +136,62 @@ public class RagService {
         Map<Long, List<String>> tagMap = buildTagMap(posts.stream().map(Post::getId).toList());
 
         int indexedChunks = 0;
+        int embeddingBatchSize = ragIndex.embeddingBatchSize();
+        Map<Long, List<Document>> pendingDocuments = new LinkedHashMap<>();
+        int pendingChunkCount = 0;
         for (Post post : posts) {
             User author = userMap.get(post.getUserId());
             List<String> tags = tagMap.getOrDefault(post.getId(), Collections.emptyList());
             List<Document> documents = buildPostDocuments(post, author, tags);
-            ragIndex.replaceChunks(post.getId(), documents);
-            markVectorized(post.getId());
-            indexedChunks += documents.size();
+
+            /*
+             * 批次上限按 chunk 数而不是帖子数计算，因为一次 Embedding 请求的实际输入单位是 chunk。
+             * 当加入当前帖子会超过上限时，先提交已经积累的完整帖子；不拆开 pendingDocuments 中的帖子，
+             * 这样只有整篇帖子的所有新向量均生成并写入成功后，才会更新该帖子的 MySQL 向量化标记。
+             */
+            if (!pendingDocuments.isEmpty() && pendingChunkCount + documents.size() > embeddingBatchSize) {
+                indexedChunks += flushProjectionBatch(pendingDocuments);
+                pendingChunkCount = 0;
+            }
+            pendingDocuments.put(post.getId(), documents);
+            pendingChunkCount += documents.size();
+
+            // 单篇长笔记可能自身就超过批次上限，立即提交；底层仍会按上限拆分远程 Embedding 请求。
+            if (pendingChunkCount >= embeddingBatchSize) {
+                indexedChunks += flushProjectionBatch(pendingDocuments);
+                pendingChunkCount = 0;
+            }
         }
 
+        // 提交不足一个完整批次的尾部帖子，避免最后几篇笔记一直停留在待向量化状态。
+        indexedChunks += flushProjectionBatch(pendingDocuments);
+
+        return indexedChunks;
+    }
+
+    /**
+     * 提交一批完整帖子，并在 Elasticsearch 写入全部成功后更新 MySQL 状态。
+     * <p>
+     * 若 Embedding 或 Elasticsearch 任一阶段抛出异常，本方法不会为该批次中的任何帖子写入
+     * {@code is_vectorized=1}。下次增量同步仍会重新选择这些帖子，从而保留可重试性。
+     *
+     * @param pendingDocuments 按同步顺序保存的帖子及其 chunk；调用成功或失败后均由调用方决定是否重试
+     * @return 本批次成功写入的 chunk 数
+     */
+    private int flushProjectionBatch(Map<Long, List<Document>> pendingDocuments) {
+        if (pendingDocuments.isEmpty()) {
+            return 0;
+        }
+
+        /*
+         * 创建批次快照后再交给索引层，避免清空累积容器时同时修改被调用方持有的 Map 引用。
+         * 这也让日志、监控或后续异步实现看到的批次内容始终稳定。
+         */
+        Map<Long, List<Document>> submittedDocuments = new LinkedHashMap<>(pendingDocuments);
+        int indexedChunks = ragIndex.replaceChunksBatch(submittedDocuments);
+        // replaceChunksBatch 返回前已完成整批写入，因此此处可以安全地逐篇更新业务库状态。
+        submittedDocuments.keySet().forEach(this::markVectorized);
+        pendingDocuments.clear();
         return indexedChunks;
     }
 

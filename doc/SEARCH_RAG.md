@@ -42,9 +42,9 @@ RAG 索引按帖子分块，包含：
 - `summary`、`link`
 - `embedding`
 
-默认向量维度为 1024，相似度使用 cosine。检索将 SmartCN 文本匹配与 kNN 向量召回放入同一混合查询，其中标题和标签具有更高文本权重。
+默认向量维度为 1024，相似度使用 cosine。检索分别执行 SmartCN BM25 与 kNN 向量召回，再在应用层使用 Reciprocal Rank Fusion（RRF）按名次融合，避免直接相加不同量纲的原始分数。BM25 中标题和标签具有更高权重；kNN 使用独立的 cosine 最低相似度门槛。
 
-短内容直接形成一个分块；较长内容按目标长度切分并保留重叠，避免跨分块语义断裂。检索结果按 `postId` 去重后可作为旅行 Agent 的社区笔记引用。
+短内容直接形成一个分块；较长内容按目标长度切分并保留重叠，避免跨分块语义断裂。RRF 排序后默认每篇笔记最多保留两个 chunk，防止同一篇笔记占满上下文；前端引用仍按 `postId` 去重。
 
 ## 同步规则
 
@@ -66,7 +66,9 @@ Elasticsearch 写入成功后才设置 `is_indexed = 1` 并更新 `indexed_at`�
 - `vectorized_at` 为空
 - `updated_at > vectorized_at`
 
-同步单篇帖子时先删除旧分块，再写入新分块，成功后更新向量化状态。草稿、空内容或已删除帖子应移除对应索引文档。
+同步会将多篇帖子的 chunk 按配置上限合并成批量 Embedding 请求，减少连续单条请求的次数。每批所有向量生成并写入 Elasticsearch 成功后，才更新该批帖子的向量化状态；批次失败时不标记已向量化，下次增量同步会自动重试。
+
+同步单篇帖子时先生成该帖子的全部新向量，再删除旧分块并写入新分块，成功后更新向量化状态。草稿、空内容或已删除帖子应移除对应索引文档。
 
 ## 管理端同步
 
@@ -100,12 +102,33 @@ POST /api/admin/rag/sync
 | `SEARCH_INDEX_PREFIX` | 全文索引前缀 |
 | `RAG_INDEX_PREFIX` | RAG 索引前缀 |
 | `RAG_VECTOR_DIMENSIONS` | 索引向量维度 |
+| `RAG_EMBEDDING_BATCH_SIZE` | 单次 Embedding API 合并的文本数，默认 10，实际限制为 1～10 |
 | `RAG_NUM_CANDIDATES` | kNN 候选数量 |
+| `RAG_CANDIDATE_COUNT` | BM25 和 kNN 各自召回的融合候选数 |
+| `RAG_RRF_RANK_CONSTANT` | RRF 排名融合常量 |
+| `RAG_MAX_CHUNKS_PER_POST` | 同一篇笔记最多进入上下文的 chunk 数 |
+| `RAG_SIMILARITY_THRESHOLD` | kNN 召回的原始 cosine 最低相似度 |
 | `RAG_TOP_K` | 默认召回数量 |
 | `AI_EMBEDDING_MODEL` / `AI_EMBEDDING_DIMENSIONS` | Embedding 模型与输出维度 |
 
 `RAG_VECTOR_DIMENSIONS` 必须与 Embedding 模型实际输出维度一致，否则写入会失败。
-当前索引补偿通过管理员同步接口执行，不依赖应用启动时自动重建。
+
+应用启动时不扫描 MySQL，也不自动批量同步全文索引或 RAG 向量索引。历史数据的增量补偿只能由管理员同步接口显式触发；帖子发布、修改和删除后的单篇投影更新仍在 MySQL 事务提交后执行。`ensureIndex()` 只在首次使用时创建空索引和 mapping，不会同步业务数据。
+
+## 召回评测
+
+日常 `mvn test` 会验证 RRF、双路候选合并、稳定排序和同笔记 chunk 限制，不依赖外部服务。
+
+需要对开发环境的真实 Elasticsearch 索引进行评测时，先完成 RAG 增量同步并配置模型凭据，然后执行：
+
+```bash
+cd java-project
+mvn -DrunRagEvaluation=true -Dtest=RagRetrievalEvaluationTest test
+```
+
+评测开关是 Maven 系统属性，不应写入 `.env.dev` 或部署环境；普通 `mvn test` 即使看到同名环境变量也不会执行真实评测。真实评测只加载 RAG、Elasticsearch 和 Embedding 所需的最小 Spring 上下文，不依赖 JWT、MySQL、Redis、RabbitMQ 或 COS 配置。
+
+评测使用 50 条基于开发种子数据的查询。启动后先批量预生成查询向量（默认为 5 次 API 请求），旧混合查询与当前 RRF 复用同一份向量。输出会单独显示 Embedding 准备耗时；Recall@5、MRR@5、nDCG@5、无答案拒绝率与 P95 中的 P95 只统计 Elasticsearch 检索和应用层排序。
 
 ## 运维原则
 

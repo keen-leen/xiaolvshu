@@ -77,11 +77,15 @@ app:
 
   rag:
     top-k: ${RAG_TOP_K:5}
+    # 单次 Embedding API 最多发送的文本数；应用内部会再将其限制在 1～10。
+    embedding-batch-size: ${RAG_EMBEDDING_BATCH_SIZE:10}
     similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.45}
-    auto-sync-on-startup: ${RAG_AUTO_SYNC_ON_STARTUP:false}
     index-prefix: ${RAG_INDEX_PREFIX:xiaolvshu}
     dimensions: ${RAG_VECTOR_DIMENSIONS:1024}
     num-candidates: ${RAG_NUM_CANDIDATES:100}
+    candidate-count: ${RAG_CANDIDATE_COUNT:30}
+    rrf-rank-constant: ${RAG_RRF_RANK_CONSTANT:60}
+    max-chunks-per-post: ${RAG_MAX_CHUNKS_PER_POST:2}
 
   search:
     index-prefix: ${SEARCH_INDEX_PREFIX:xiaolvshu}

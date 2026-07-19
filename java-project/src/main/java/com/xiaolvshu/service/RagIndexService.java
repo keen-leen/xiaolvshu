@@ -70,6 +70,26 @@ public class RagIndexService {
     private float similarityThreshold;
 
     /**
+     * BM25 候选进入 RRF 前的最低原始分数。
+     * <p>
+     * Elasticsearch 对任何能分词命中的查询都可能返回结果；此门槛先去掉仅命中
+     * 常见弱词的文档，避免无关 BM25 候选只因为“名次靠前”就被 RRF 保留。
+     */
+    @Value("${app.rag.bm25-min-score:2.0}")
+    private double bm25MinScore;
+
+    /** BM25 单路命中可被独立认定为可靠结果的强相关分数。 */
+    @Value("${app.rag.bm25-strong-score:12.3}")
+    private double bm25StrongScore;
+
+    /**
+     * kNN 单路命中可被独立认定为可靠结果的原始 cosine 相似度。
+     * 它必须不低于 {@link #similarityThreshold}，应用层会对错误配置做安全修正。
+     */
+    @Value("${app.rag.vector-strong-similarity:0.55}")
+    private double vectorStrongSimilarity;
+
+    /**
      * 单次发送给 Embedding API 的最大文本数量。
      * <p>
      * 默认值 10 同时兼容 text-embedding-v4 和 qwen3.7-text-embedding；所有批量入口都经过该值分片，
@@ -254,15 +274,34 @@ public class RagIndexService {
      * 普通业务调用仍使用 {@link #hybridSearch(String, int)}，公开行为保持不变。
      */
     List<Document> hybridSearch(String text, List<Float> vector, int topK) {
+        return hybridSearch(text, vector, topK, true);
+    }
+
+    /**
+     * 评测专用的拒绝前检索入口。
+     * <p>
+     * 它复用当前 BM25、kNN 与 RRF 排序，但关闭 BM25 最低分和候选可靠性过滤，
+     * 用于在同一份代码和查询向量上量化“无关结果拒绝”本身造成的收益与召回损失。
+     */
+    List<Document> hybridSearchWithoutRejection(String text, List<Float> vector, int topK) {
+        return hybridSearch(text, vector, topK, false);
+    }
+
+    /** 根据是否启用可靠性策略执行完整混合检索，避免生产入口和评测入口复制两套查询代码。 */
+    private List<Document> hybridSearch(String text, List<Float> vector, int topK, boolean rejectUnreliable) {
         ensureIndex();
         validateVector(vector);
         // 如果调用方要求的 topK 大于默认候选数，至少要保证每路能召回 topK 条。
         int safeCandidateCount = Math.max(topK, candidateCount);
         // BM25 和 kNN 的原始分数量纲不同，不能直接相加；先独立召回，再只使用名次做 RRF。
-        List<SearchCandidate> lexicalCandidates = lexicalSearch(text, safeCandidateCount);
+        List<SearchCandidate> lexicalCandidates = lexicalSearch(
+                text, safeCandidateCount, rejectUnreliable ? bm25MinScore : 0.0d);
         List<SearchCandidate> vectorCandidates = vectorSearch(vector, safeCandidateCount);
+        RetrievalPolicy policy = rejectUnreliable
+                ? new RetrievalPolicy(bm25StrongScore, Math.max(similarityThreshold, vectorStrongSimilarity))
+                : RetrievalPolicy.acceptAllSingleRoute();
         return reciprocalRankFusion(lexicalCandidates, vectorCandidates, topK,
-                rrfRankConstant, maxChunksPerPost);
+                rrfRankConstant, maxChunksPerPost, policy);
     }
 
     /**
@@ -271,9 +310,11 @@ public class RagIndexService {
      * 标题和标签对目的地、景点名、店名等精确实体更重要，因此分别使用 3 倍和 2 倍权重；
      * embedding 字段体积大且不参与文本匹配，从 {@code _source} 中排除可减少网络传输和反序列化开销。
      */
-    private List<SearchCandidate> lexicalSearch(String text, int limit) {
+    private List<SearchCandidate> lexicalSearch(String text, int limit, double minimumScore) {
         try {
             SearchResponse<Map> response = client.search(s -> s.index(chunkIndex()).size(limit)
+                    // minScore 由 Elasticsearch 在返回候选前执行，减少弱命中的网络传输和后续融合成本。
+                    .minScore(Math.max(0.0d, minimumScore))
                     .source(src -> src.filter(f -> f.excludes("embedding")))
                     .query(q -> q.multiMatch(mm -> mm.query(text)
                             .fields("title^3", "tags^2", "text"))), Map.class);
@@ -341,14 +382,32 @@ public class RagIndexService {
             int topK,
             int rankConstant,
             int maxChunksPerPost) {
+        // 旧的纯排序单元测试不关心拒绝，使用最宽松策略保持原有方法语义。
+        return reciprocalRankFusion(lexicalCandidates, vectorCandidates, topK,
+                rankConstant, maxChunksPerPost, RetrievalPolicy.acceptAllSingleRoute());
+    }
+
+    /**
+     * 完成 RRF 融合、候选可靠性判断和同帖 chunk 多样性限制。
+     * <p>
+     * 双路都命中表示文本词项与语义同时支持该候选，可直接保留；单路候选则必须达到
+     * 对应的强相关门槛。这样既能拒绝无关查询，又能保留只被精确实体或语义改写命中的真实结果。
+     */
+    static List<Document> reciprocalRankFusion(
+            List<SearchCandidate> lexicalCandidates,
+            List<SearchCandidate> vectorCandidates,
+            int topK,
+            int rankConstant,
+            int maxChunksPerPost,
+            RetrievalPolicy policy) {
         if (topK <= 0) {
             return List.of();
         }
 
         Map<String, FusedCandidate> fusedById = new LinkedHashMap<>();
         // 使用同一张 Map 累加两路贡献，文档 ID 是 chunk 级唯一键，不会错误合并同帖的不同 chunk。
-        addRankedCandidates(fusedById, lexicalCandidates, rankConstant);
-        addRankedCandidates(fusedById, vectorCandidates, rankConstant);
+        addRankedCandidates(fusedById, lexicalCandidates, rankConstant, RetrievalRoute.LEXICAL);
+        addRankedCandidates(fusedById, vectorCandidates, rankConstant, RetrievalRoute.VECTOR);
 
         // RRF 同分时先看单路最好名次，再用文档 ID 打破平局，保证相同输入每次都得到稳定顺序。
         List<FusedCandidate> ranked = fusedById.values().stream()
@@ -361,6 +420,10 @@ public class RagIndexService {
         Map<String, Integer> chunksByPost = new HashMap<>();
         List<Document> documents = new ArrayList<>();
         for (FusedCandidate fused : ranked) {
+            if (!isReliable(fused, policy)) {
+                // 弱单路候选不进入上下文；如果全部候选都被过滤，方法自然返回空列表。
+                continue;
+            }
             SearchCandidate candidate = fused.candidate();
             Object postId = candidate.source().get("postId");
             // 正常索引文档都有 postId；若历史脏数据缺失该字段，回退到文档 ID，避免所有缺失项被归为同一篇笔记。
@@ -374,6 +437,14 @@ public class RagIndexService {
             String content = String.valueOf(metadata.remove("text"));
             // embedding 仅用于检索，不能进入 Spring AI Document metadata，否则会浪费内存并增大工具结果。
             metadata.remove("embedding");
+            // 证据分数仅作为后端诊断元数据，不改变对外 DTO 字段。
+            metadata.put("ragRouteCount", fused.routeCount());
+            if (fused.lexicalScore() != null) {
+                metadata.put("ragLexicalScore", fused.lexicalScore());
+            }
+            if (fused.vectorSimilarity() != null) {
+                metadata.put("ragVectorSimilarity", fused.vectorSimilarity());
+            }
             documents.add(new Document(content, metadata));
             chunksByPost.put(postKey, usedChunks + 1);
             if (documents.size() >= topK) {
@@ -386,7 +457,8 @@ public class RagIndexService {
     private static void addRankedCandidates(
             Map<String, FusedCandidate> fusedById,
             List<SearchCandidate> candidates,
-            int rankConstant) {
+            int rankConstant,
+            RetrievalRoute route) {
         if (candidates == null || candidates.isEmpty()) {
             return;
         }
@@ -400,10 +472,21 @@ public class RagIndexService {
             // rank 从 1 开始，与信息检索领域的排名定义保持一致。
             double contribution = 1.0d / (safeRankConstant + rank);
             fusedById.compute(candidate.id(), (id, existing) -> existing == null
-                    ? new FusedCandidate(candidate, contribution, rank)
-                    : new FusedCandidate(existing.candidate(), existing.rrfScore() + contribution,
-                            Math.min(existing.bestRank(), rank)));
+                    ? FusedCandidate.first(candidate, contribution, rank, route)
+                    : existing.merge(candidate, contribution, rank, route));
         }
+    }
+
+    /** 根据双路证据或强单路分数判断候选是否足够可靠。 */
+    private static boolean isReliable(FusedCandidate candidate, RetrievalPolicy policy) {
+        if (candidate.routeCount() >= 2) {
+            return true;
+        }
+        if (candidate.lexicalScore() != null && candidate.lexicalScore() >= policy.bm25StrongScore()) {
+            return true;
+        }
+        return candidate.vectorSimilarity() != null
+                && candidate.vectorSimilarity() >= policy.vectorStrongSimilarity();
     }
 
     /**
@@ -416,8 +499,75 @@ public class RagIndexService {
     static record SearchCandidate(String id, Map<String, Object> source, double score) {
     }
 
-    /** RRF 聚合过程中的内部状态，同时保存累计分数和两路中的最好名次用于稳定排序。 */
-    private record FusedCandidate(SearchCandidate candidate, double rrfScore, int bestRank) {
+    /** 候选来自 BM25 文本路径还是 kNN 向量路径。 */
+    private enum RetrievalRoute {
+        LEXICAL,
+        VECTOR
+    }
+
+    /**
+     * 候选可靠性策略。
+     *
+     * @param bm25StrongScore BM25 单路强相关门槛
+     * @param vectorStrongSimilarity kNN 单路原始 cosine 强相关门槛
+     */
+    static record RetrievalPolicy(double bm25StrongScore, double vectorStrongSimilarity) {
+        static RetrievalPolicy acceptAllSingleRoute() {
+            return new RetrievalPolicy(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY);
+        }
+    }
+
+    /**
+     * RRF 聚合过程中的内部状态。
+     * <p>
+     * Elasticsearch 对 cosine 密集向量返回的 {@code _score} 为 {@code (1 + cosine) / 2}，
+     * 因此这里在保存向量证据时还原为原始 cosine，与查询中的 similarity 配置保持同一量纲。
+     */
+    private record FusedCandidate(
+            SearchCandidate candidate,
+            double rrfScore,
+            int bestRank,
+            Double lexicalScore,
+            Double vectorSimilarity,
+            int routeCount) {
+
+        static FusedCandidate first(
+                SearchCandidate candidate,
+                double contribution,
+                int rank,
+                RetrievalRoute route) {
+            return new FusedCandidate(
+                    candidate,
+                    contribution,
+                    rank,
+                    route == RetrievalRoute.LEXICAL ? candidate.score() : null,
+                    route == RetrievalRoute.VECTOR ? cosineFromElasticsearchScore(candidate.score()) : null,
+                    1);
+        }
+
+        FusedCandidate merge(
+                SearchCandidate nextCandidate,
+                double contribution,
+                int rank,
+                RetrievalRoute route) {
+            Double nextLexicalScore = lexicalScore;
+            Double nextVectorSimilarity = vectorSimilarity;
+            int nextRouteCount = routeCount;
+            if (route == RetrievalRoute.LEXICAL && nextLexicalScore == null) {
+                nextLexicalScore = nextCandidate.score();
+                nextRouteCount++;
+            } else if (route == RetrievalRoute.VECTOR && nextVectorSimilarity == null) {
+                nextVectorSimilarity = cosineFromElasticsearchScore(nextCandidate.score());
+                nextRouteCount++;
+            }
+            return new FusedCandidate(candidate, rrfScore + contribution, Math.min(bestRank, rank),
+                    nextLexicalScore, nextVectorSimilarity, nextRouteCount);
+        }
+
+        private static double cosineFromElasticsearchScore(double score) {
+            // 由于浮点返回可能有极小误差，将还原值限制在 cosine 法定范围内。
+            return Math.max(-1.0d, Math.min(1.0d, score * 2.0d - 1.0d));
+        }
     }
 
     /**

@@ -255,7 +255,7 @@ public class RagService {
      */
     private String renderContextText(List<Document> docs) {
         if (docs == null || docs.isEmpty()) {
-            return "未检索到相关笔记";
+            return "未检索到可靠社区笔记";
         }
 
         StringBuilder builder = new StringBuilder();
@@ -273,7 +273,7 @@ public class RagService {
             }
             builder.append("片段: ").append(doc.getText().trim()).append("\n\n");
         }
-        return builder.isEmpty() ? "未检索到相关笔记" : builder.toString();
+        return builder.isEmpty() ? "未检索到可靠社区笔记" : builder.toString();
     }
 
     /**

@@ -98,6 +98,14 @@ class RagServiceTest {
     }
 
     @Test
+    void shouldExplainThatNoReliableCommunityNoteWasFoundAfterRejection() {
+        // 当可靠性策略过滤掉全部候选时，上下文必须明确表示“可靠结果不足”。
+        String context = ReflectionTestUtils.invokeMethod(ragService, "renderContextText", List.of());
+
+        assertEquals("未检索到可靠社区笔记", context);
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void shouldBatchTwelveSingleChunkPostsAsTenAndTwoThenMarkAllPosts() {
         PostMapper postMapper = mock(PostMapper.class);

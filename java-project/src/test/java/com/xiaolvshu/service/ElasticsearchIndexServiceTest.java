@@ -193,12 +193,60 @@ class ElasticsearchIndexServiceTest {
                 List.of(candidate("1-0", 1L, 0)), List.of(), 0, 60, 2).isEmpty());
     }
 
+    @Test
+    void shouldRejectWeakSingleRouteCandidates() {
+        RagIndexService.RetrievalPolicy policy = new RagIndexService.RetrievalPolicy(12.3d, 0.55d);
+
+        // BM25 只有 2 分，未达到 12.3 分强单路门槛；kNN 的 ES 分数 0.75 还原后 cosine 仅为 0.50。
+        List<Document> lexicalOnly = RagIndexService.reciprocalRankFusion(
+                List.of(candidate("1-0", 1L, 0, 2.0d)), List.of(), 5, 60, 2, policy);
+        List<Document> vectorOnly = RagIndexService.reciprocalRankFusion(
+                List.of(), List.of(candidate("2-0", 2L, 0, 0.75d)), 5, 60, 2, policy);
+
+        assertTrue(lexicalOnly.isEmpty());
+        assertTrue(vectorOnly.isEmpty());
+    }
+
+    @Test
+    void shouldKeepCandidateSupportedByBothRetrievalRoutesEvenWhenSingleScoresAreWeak() {
+        RagIndexService.RetrievalPolicy policy = new RagIndexService.RetrievalPolicy(12.3d, 0.55d);
+
+        // 同一 chunk 同时被 BM25 与 kNN 命中，双路证据比任一单路的绝对分数更可靠。
+        List<Document> documents = RagIndexService.reciprocalRankFusion(
+                List.of(candidate("1-0", 1L, 0, 2.0d)),
+                List.of(candidate("1-0", 1L, 0, 0.70d)),
+                5, 60, 2, policy);
+
+        assertEquals(List.of("1"), postIds(documents));
+        assertEquals(2, documents.getFirst().getMetadata().get("ragRouteCount"));
+    }
+
+    @Test
+    void shouldKeepStrongCandidateFromEitherSingleRoute() {
+        RagIndexService.RetrievalPolicy policy = new RagIndexService.RetrievalPolicy(12.3d, 0.55d);
+
+        // ES cosine _score=0.81 对应原始 cosine=0.62，高于向量强单路门槛 0.55。
+        List<Document> documents = RagIndexService.reciprocalRankFusion(
+                List.of(candidate("1-0", 1L, 0, 16.0d)),
+                List.of(candidate("2-0", 2L, 0, 0.81d)),
+                5, 60, 2, policy);
+
+        assertEquals(List.of("1", "2"), postIds(documents));
+        assertEquals(16.0d, documents.getFirst().getMetadata().get("ragLexicalScore"));
+        assertEquals(0.62d, (Double) documents.getLast().getMetadata().get("ragVectorSimilarity"), 0.000001d);
+    }
+
     private RagIndexService.SearchCandidate candidate(String id, Long postId, int chunkIndex) {
         // 构造最小 ES _source 形状；score 对 RRF 排名无影响，固定为 1 可以突出测试只依赖列表名次。
+        return candidate(id, postId, chunkIndex, 1.0d);
+    }
+
+    private RagIndexService.SearchCandidate candidate(String id, Long postId, int chunkIndex, double score) {
+        // 带分数的辅助方法专门用于验证可靠性门槛，_source 仍保持最小形状。
         return new RagIndexService.SearchCandidate(id, Map.of(
                 "postId", String.valueOf(postId),
                 "chunkIndex", chunkIndex,
-                "text", "chunk-" + id), 1.0d);
+                "text", "chunk-" + id), score);
     }
 
     private List<String> postIds(List<Document> documents) {

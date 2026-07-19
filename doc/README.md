@@ -14,6 +14,7 @@
 
 - [COMMUNITY.md](COMMUNITY.md)：账号、内容、互动、通知和上传。
 - [SEARCH_RAG.md](SEARCH_RAG.md)：全文搜索、向量检索和索引同步。
+- [RAG_EVALUATION_HISTORY.md](RAG_EVALUATION_HISTORY.md)：RAG 真实评测的参数、指标、调整和结论历史。
 - [TRAVEL_AGENT.md](TRAVEL_AGENT.md)：旅行规划 Agent 与 SSE 协议。
 - [ADMIN.md](ADMIN.md)：后台认证、数据管理、监控和索引运维。
 - [REDIS.md](REDIS.md)：缓存、限流、分布式锁和 Key 规范。

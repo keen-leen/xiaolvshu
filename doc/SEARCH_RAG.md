@@ -44,6 +44,8 @@ RAG 索引按帖子分块，包含：
 
 默认向量维度为 1024，相似度使用 cosine。检索分别执行 SmartCN BM25 与 kNN 向量召回，再在应用层使用 Reciprocal Rank Fusion（RRF）按名次融合，避免直接相加不同量纲的原始分数。BM25 中标题和标签具有更高权重；kNN 使用独立的 cosine 最低相似度门槛。
 
+RRF 融合后还会执行可靠性判断：BM25 和 kNN 双路同时命中的 chunk 可直接保留，只有单路命中时必须达到对应的强相关门槛。如果所有候选都不可靠，检索返回空结果，不会为了填满 `topK` 而强行向 Agent 提供无关社区笔记。当前默认门槛由 50 条真实评测确定：kNN 最低 cosine 为 0.45、BM25 最低分为 2.0、BM25 强单路分为 12.3、kNN 强单路 cosine 为 0.55。
+
 短内容直接形成一个分块；较长内容按目标长度切分并保留重叠，避免跨分块语义断裂。RRF 排序后默认每篇笔记最多保留两个 chunk，防止同一篇笔记占满上下文；前端引用仍按 `postId` 去重。
 
 ## 同步规则
@@ -108,6 +110,9 @@ POST /api/admin/rag/sync
 | `RAG_RRF_RANK_CONSTANT` | RRF 排名融合常量 |
 | `RAG_MAX_CHUNKS_PER_POST` | 同一篇笔记最多进入上下文的 chunk 数 |
 | `RAG_SIMILARITY_THRESHOLD` | kNN 召回的原始 cosine 最低相似度 |
+| `RAG_BM25_MIN_SCORE` | BM25 候选进入 RRF 前的最低分数 |
+| `RAG_BM25_STRONG_SCORE` | BM25 单路候选独立保留的强相关分数 |
+| `RAG_VECTOR_STRONG_SIMILARITY` | kNN 单路候选独立保留的原始 cosine 相似度 |
 | `RAG_TOP_K` | 默认召回数量 |
 | `AI_EMBEDDING_MODEL` / `AI_EMBEDDING_DIMENSIONS` | Embedding 模型与输出维度 |
 
@@ -119,14 +124,14 @@ POST /api/admin/rag/sync
 
 日常 `mvn test` 会验证 RRF、双路候选合并、稳定排序和同笔记 chunk 限制，不依赖外部服务。
 
-需要对开发环境的真实 Elasticsearch 索引进行评测时，先完成 RAG 增量同步并配置模型凭据，然后执行：
+需要对开发环境的真实 Elasticsearch 索引进行评测时，先完成 RAG 增量同步并配置模型凭据，然后通过脚本执行并记录本轮调整：
 
 ```bash
 cd java-project
-mvn -DrunRagEvaluation=true -Dtest=RagRetrievalEvaluationTest test
+./scripts/run-rag-evaluation.sh "本轮修改说明"
 ```
 
-评测开关是 Maven 系统属性，不应写入 `.env.dev` 或部署环境；普通 `mvn test` 即使看到同名环境变量也不会执行真实评测。真实评测只加载 RAG、Elasticsearch 和 Embedding 所需的最小 Spring 上下文，不依赖 JWT、MySQL、Redis、RabbitMQ 或 COS 配置。
+脚本会显式开启评测并将结果追加到 [RAG_EVALUATION_HISTORY.md](RAG_EVALUATION_HISTORY.md)。普通 `mvn test` 不执行真实评测，也不修改评测历史。真实评测只加载 RAG、Elasticsearch 和 Embedding 所需的最小 Spring 上下文，不依赖 JWT、MySQL、Redis、RabbitMQ 或 COS 配置。
 
 评测使用 50 条基于开发种子数据的查询。启动后先批量预生成查询向量（默认为 5 次 API 请求），旧混合查询与当前 RRF 复用同一份向量。输出会单独显示 Embedding 准备耗时；Recall@5、MRR@5、nDCG@5、无答案拒绝率与 P95 中的 P95 只统计 Elasticsearch 检索和应用层排序。
 

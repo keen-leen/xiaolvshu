@@ -80,6 +80,10 @@ app:
     # 单次 Embedding API 最多发送的文本数；应用内部会再将其限制在 1～10。
     embedding-batch-size: ${RAG_EMBEDDING_BATCH_SIZE:10}
     similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.45}
+    # BM25 弱命中先于 RRF 过滤；强单路门槛用于保留没有双路交集的高置信候选。
+    bm25-min-score: ${RAG_BM25_MIN_SCORE:2.0}
+    bm25-strong-score: ${RAG_BM25_STRONG_SCORE:12.3}
+    vector-strong-similarity: ${RAG_VECTOR_STRONG_SIMILARITY:0.55}
     index-prefix: ${RAG_INDEX_PREFIX:xiaolvshu}
     dimensions: ${RAG_VECTOR_DIMENSIONS:1024}
     num-candidates: ${RAG_NUM_CANDIDATES:100}

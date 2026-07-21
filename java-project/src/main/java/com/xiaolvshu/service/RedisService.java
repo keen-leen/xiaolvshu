@@ -592,7 +592,10 @@ public class RedisService {
         String[] stringArgs = Arrays.stream(args)
                 .map(String::valueOf)
                 .toArray(String[]::new);
-        Long result = redisTemplate.execute(redisScript, stringSerializer, longSerializer, keys, stringArgs);
+        // 显式转为 Object[]，表明这里要将每个字符串作为独立 ARGV 传入，
+        // 同时避免 String[] 调用 Object... 时的歧义编译警告。
+        Long result = redisTemplate.execute(redisScript, stringSerializer, longSerializer,
+                keys, (Object[]) stringArgs);
         return result != null ? result : 0L;
     }
 
@@ -620,19 +623,24 @@ public class RedisService {
                 local count = redis.call('ZCARD', key)
                 
                 if count < limit then
-                    redis.call('ZADD', key, now, now)
+                    -- member 必须唯一。仅用毫秒时间戳时，同一毫秒的并发请求会相互覆盖，
+                    -- 从而使滑动窗口少计数。由 Java 传入随机后缀可保留每一次请求。
+                    redis.call('ZADD', key, now, ARGV[4])
                     redis.call('EXPIRE', key, window)
                     return 1
                 else
                     return 0
                 end
                 """;
-        DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>(script, Long.class);
-        Long result = redisTemplate.execute(redisScript, 
-                Collections.singletonList(key), 
-                String.valueOf(currentTime), 
-                String.valueOf(period), 
-                String.valueOf(maxCount));
-        return Long.valueOf(1L).equals(result);
+        // RedisTemplate 的默认 value serializer 是 JSON，若直接 execute，数字参数会被编码为
+        // 带引号的 JSON 字符串，Lua 中 tonumber(ARGV[n]) 将得到 nil。统一经由
+        // evalLong 的 StringRedisSerializer 传参，保证 Lua 收到纯文本数字。
+        long result = evalLong(script,
+                Collections.singletonList(key),
+                currentTime,
+                period,
+                maxCount,
+                currentTime + "-" + UUID.randomUUID());
+        return result == 1L;
     }
 }

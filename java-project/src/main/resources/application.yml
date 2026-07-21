@@ -65,6 +65,16 @@ spring:
     default-property-inclusion: non_null
 
 app:
+  agent:
+    # Agent 会占用模型调用和长连接：同时限制单访问者速率与单实例在途请求数。
+    max-concurrent: ${AGENT_MAX_CONCURRENT:8}
+    # 只有应用确实部署在可信反向代理后时才能打开，否则客户端可伪造 X-Forwarded-For 绕过限流。
+    trust-forwarded-headers: ${AGENT_TRUST_FORWARDED_HEADERS:false}
+    rate-limit:
+      period-seconds: ${AGENT_RATE_LIMIT_PERIOD_SECONDS:60}
+      anonymous-max: ${AGENT_RATE_LIMIT_ANONYMOUS_MAX:5}
+      authenticated-max: ${AGENT_RATE_LIMIT_AUTHENTICATED_MAX:20}
+
   jwt:
     secret: ${JWT_SECRET}
     expires-in: 604800000

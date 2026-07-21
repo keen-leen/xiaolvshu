@@ -25,21 +25,22 @@ Accept: text/event-stream
 当前限制：
 
 - 最多保留 8 条历史消息。
+- 当前问题和单条历史最多 2000 字符，历史总长度最多 12000 字符。
 - 最多执行 5 个 Agent 步骤。
 - 单次工具调用超时 3 秒。
 - 重复的“工具名 + 参数”组合会被跳过。
 - Agent 请求和工具请求使用有界线程池，过载时返回可读错误。
+- 匿名用户默认每分钟 5 次，登录用户每分钟 20 次，单实例最多 8 个在途 Agent 请求。
+- `step.thought` 是后端生成的状态文案，不是模型原始推理过程。
 
 ## 工具
 
 | 工具 | 职责 | 当前数据性质 |
 | --- | --- | --- |
 | `search_community_notes` | 检索攻略、路线、景点、美食和避坑笔记 | Elasticsearch RAG 索引中的社区内容 |
-| `get_weather_forecast` | 查询目的地日期范围天气 | 规则模拟 Provider，不是实时天气 |
-| `search_travel_prices` | 估算住宿、餐饮、市内交通和门票 | 规则估算，不含实时票价 |
-| `estimate_trip_budget` | 按目的地、天数、人数和风格拆分预算 | 复用规则价格估算 |
 
-天气和价格结果必须明确标注其估算性质，最终答案不能把模拟数据描述为实时事实。
+天气、价格和预算模拟工具已移除。在接入真实 Provider 之前，Agent 必须明确说明没有实时数据源，
+只能给出带假设条件的通用建议，不得生成伪实时数值。
 
 社区笔记工具通过 RAG 混合检索获取上下文和引用，详见 [SEARCH_RAG.md](SEARCH_RAG.md)。
 
@@ -47,14 +48,16 @@ Accept: text/event-stream
 
 | 事件 | 内容 |
 | --- | --- |
-| `step` | 当前步骤、动作、思路及工具信息 |
-| `tool` | 工具执行结果、耗时、状态和可能的引用 |
+| `step` | 当前步骤、动作和后端安全状态；工具步骤包含 `toolCall` 和精简后的 `toolResult` |
 | `chunk` | 最终答案的增量文本 |
 | `refs` | 去重后的社区笔记引用 |
 | `error` | 过载、模型或工具异常时的可读错误 |
 | `done` | `[DONE]`，表示正常流结束 |
 
 前端应按事件类型处理，不应将所有 `data` 拼接为正文。收到 `error` 或连接异常时要结束加载状态；收到 `done` 后完成当前消息。
+工具调用参数只位于 `step.toolCall.arguments`；`step.toolResult` 只保留工具名、成功状态、检索上下文、错误和耗时。
+社区笔记引用只由最终 `refs` 事件发送，不再在 `toolResult` 中重复携带。
+如果请求在建立 SSE 前被拒绝，接口会返回真实 HTTP 状态：参数错误为 `400`，额度或并发超限为 `429`，Redis 限流依赖不可用为 `503`。
 
 ## 配置
 
@@ -76,5 +79,10 @@ Accept: text/event-stream
 - `RAG_BM25_MIN_SCORE`
 - `RAG_BM25_STRONG_SCORE`
 - `RAG_VECTOR_STRONG_SIMILARITY`
+- `AGENT_MAX_CONCURRENT`
+- `AGENT_RATE_LIMIT_PERIOD_SECONDS`
+- `AGENT_RATE_LIMIT_ANONYMOUS_MAX`
+- `AGENT_RATE_LIMIT_AUTHENTICATED_MAX`
+- `AGENT_TRUST_FORWARDED_HEADERS`
 
 模型密钥只保存在本地或部署环境，不得提交到仓库。

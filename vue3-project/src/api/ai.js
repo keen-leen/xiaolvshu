@@ -8,7 +8,8 @@ export const travelAiApi = {
     const response = await fetch(`${apiConfig.baseURL}/ai/travel/chat`, {
       method: 'POST',
       headers: {
-        'Accept': 'text/event-stream',
+        // 成功时返回 SSE；参数校验或限流发生在建立事件流之前，需要允许后端返回 JSON 错误体。
+        'Accept': 'text/event-stream, application/json',
         'Cache-Control': 'no-cache',
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -18,7 +19,17 @@ export const travelAiApi = {
     })
 
     if (!response.ok || !response.body) {
-      throw new Error(`流式请求失败(${response.status})`)
+      let message = `流式请求失败(${response.status})`
+      try {
+        // Agent 的参数校验、限流和依赖故障发生在 SSE 建立前，此时后端返回普通 JSON 错误体。
+        const errorBody = await response.json()
+        if (errorBody?.message) {
+          message = errorBody.message
+        }
+      } catch (e) {
+        // 代理或网关可能返回非 JSON 错误页，保留包含 HTTP 状态的默认文案。
+      }
+      throw new Error(message)
     }
 
     const reader = response.body.getReader()
@@ -43,14 +54,6 @@ export const travelAiApi = {
           handlers.onStep(JSON.parse(data || '{}'))
         } catch (e) {
           handlers.onStep({ raw: data })
-        }
-        return
-      }
-      if (eventName === 'tool' && handlers.onTool) {
-        try {
-          handlers.onTool(JSON.parse(data || '{}'))
-        } catch (e) {
-          handlers.onTool({ raw: data })
         }
         return
       }

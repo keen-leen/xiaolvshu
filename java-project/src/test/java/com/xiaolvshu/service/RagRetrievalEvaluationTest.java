@@ -4,8 +4,8 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.ai.document.Document;
@@ -13,11 +13,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
@@ -63,7 +63,7 @@ class RagRetrievalEvaluationTest {
     private ElasticsearchClient elasticsearchClient;
 
     // 以下参数同时参与检索和评测记录，保证历史文档反映本次真正生效的配置。
-    @Value("${spring.ai.openai.embedding.options.model:unknown}")
+    @Value("${spring.ai.openai.embedding.model:unknown}")
     private String embeddingModelName;
 
     @Value("${app.rag.dimensions:1024}")
@@ -171,7 +171,7 @@ class RagRetrievalEvaluationTest {
         Query hybridQuery = Query.of(q -> q.bool(b -> b.minimumShouldMatch("1")
                 .should(sh -> sh.multiMatch(mm -> mm.query(text).fields("title^3", "tags^2", "text")))
                 .should(sh -> sh.knn(k -> k.field("embedding").queryVector(vector)
-                        .numCandidates(100L)))));
+                        .numCandidates(100)))));
         SearchResponse<Map> response = elasticsearchClient.search(s -> s
                 .index(ragIndexService.chunkIndex())
                 .size(TOP_K)
@@ -442,7 +442,7 @@ class RagRetrievalEvaluationTest {
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = {
             DataSourceAutoConfiguration.class,
-            RedisAutoConfiguration.class,
+            DataRedisAutoConfiguration.class,
             RabbitAutoConfiguration.class,
             SecurityAutoConfiguration.class,
             UserDetailsServiceAutoConfiguration.class

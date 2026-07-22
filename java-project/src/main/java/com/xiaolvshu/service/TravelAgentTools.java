@@ -18,7 +18,8 @@ public class TravelAgentTools {
      * 社区笔记检索工具。
      * <p>
      * RAG 在 Agent 中被当作普通工具使用，而不是固定前置步骤；攻略、路线、避坑等问题通常会优先调用它。
-     * 当前 Agent 仍由后端手动执行工具，@Tool 主要作为工具 schema 元信息和后续接入 Spring AI 原生 tool-calling 的准备。
+     * Spring AI 2.0 会从 @Tool/@ToolParam 生成模型可见的 JSON Schema；真正执行前仍由
+     * TravelAgentService 做白名单、参数边界、去重和超时校验，不能把模型输出直接视为可信调用。
      */
     @Tool(name = "search_community_notes", description = "检索小旅书社区真实旅行笔记，适合攻略、路线、景点、美食、避坑、小众玩法等问题。")
     public CommunitySearchResult searchCommunityNotes(

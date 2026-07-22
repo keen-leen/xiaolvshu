@@ -3,7 +3,7 @@ package com.xiaolvshu.config;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -89,16 +89,20 @@ public class RabbitMQConfig {
 
     // ============ 消息转换器 ============
 
+    /**
+     * Spring Boot 4 默认使用 Jackson 3，因此改用不带版本号的转换器。
+     * 队列中的 JSON 字段结构保持不变；若生产环境仍残留旧消息，应在升级前用预发环境验证反序列化兼容性。
+     */
     @Bean
-    public MessageConverter jackson2JsonMessageConverter() {
-        return new Jackson2JsonMessageConverter();
+    public MessageConverter jacksonJsonMessageConverter() {
+        return new JacksonJsonMessageConverter();
     }
 
     @Bean
     public RabbitTemplate rabbitTemplate(@NonNull ConnectionFactory connectionFactory,
-                                         @NonNull MessageConverter jackson2JsonMessageConverter) {
+                                         @NonNull MessageConverter jacksonJsonMessageConverter) {
         RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
-        rabbitTemplate.setMessageConverter(jackson2JsonMessageConverter);
+        rabbitTemplate.setMessageConverter(jacksonJsonMessageConverter);
         return rabbitTemplate;
     }
 }

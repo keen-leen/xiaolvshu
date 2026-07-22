@@ -41,15 +41,16 @@ spring:
   ai:
     openai:
       api-key: ${AI_API_KEY}
-      base-url: ${AI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      # Spring AI 2.0 的 OpenAI Java SDK 会在 base-url 后追加 /chat/completions。
+      # DashScope 兼容协议的 API 根路径本身包含 /v1，缺失时会请求
+      # /compatible-mode/chat/completions 并返回 404 Unknown。
+      base-url: ${AI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
       chat:
-        options:
-          model: ${AI_CHAT_MODEL:qwen-plus}
-          temperature: ${AI_TEMPERATURE:0.3}
+        model: ${AI_CHAT_MODEL:qwen-plus}
+        temperature: ${AI_TEMPERATURE:0.3}
       embedding:
-        options:
-          model: ${AI_EMBEDDING_MODEL:text-embedding-v4}
-          dimensions: ${AI_EMBEDDING_DIMENSIONS:1024}
+        model: ${AI_EMBEDDING_MODEL:text-embedding-v4}
+        dimensions: ${AI_EMBEDDING_DIMENSIONS:1024}
 
   servlet:
     multipart:
@@ -68,6 +69,10 @@ app:
   agent:
     # Agent 会占用模型调用和长连接：同时限制单访问者速率与单实例在途请求数。
     max-concurrent: ${AGENT_MAX_CONCURRENT:8}
+    # SSE 心跳用于穿过代理缓冲并及时发现客户端断开；总超时防止无限占用模型与并发许可。
+    heartbeat-seconds: ${AGENT_HEARTBEAT_SECONDS:15}
+    run-timeout-seconds: ${AGENT_RUN_TIMEOUT_SECONDS:120}
+    tool-timeout-seconds: ${AGENT_TOOL_TIMEOUT_SECONDS:3}
     # 只有应用确实部署在可信反向代理后时才能打开，否则客户端可伪造 X-Forwarded-For 绕过限流。
     trust-forwarded-headers: ${AGENT_TRUST_FORWARDED_HEADERS:false}
     rate-limit:

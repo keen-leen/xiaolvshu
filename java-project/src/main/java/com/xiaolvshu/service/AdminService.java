@@ -2,7 +2,7 @@ package com.xiaolvshu.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.xiaolvshu.dto.AdminListRequest;
 import com.xiaolvshu.dto.PageResult;
 import com.xiaolvshu.entity.Admin;
@@ -156,4 +156,3 @@ public class AdminService extends ServiceImpl<AdminMapper, Admin> {
         log.info("重置管理员密码成功 - ID: {}", id);
     }
 }
-

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.xiaolvshu.entity.Post;
+import com.xiaolvshu.entity.PostTag;
 import com.xiaolvshu.mapper.PostMapper;
 import com.xiaolvshu.mapper.PostTagMapper;
 import com.xiaolvshu.mapper.TagMapper;
@@ -43,6 +44,7 @@ class RagServiceTest {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "test");
         assistant.setCurrentNamespace("com.xiaolvshu.mapper.PostMapper");
         TableInfoHelper.initTableInfo(assistant, Post.class);
+        TableInfoHelper.initTableInfo(assistant, PostTag.class);
     }
 
     @Test
@@ -93,7 +95,7 @@ class RagServiceTest {
 
         String context = ReflectionTestUtils.invokeMethod(ragService, "renderContextText", List.of(document));
 
-        assertEquals("标题: 成都美食攻略\n标签: 成都、美食\n片段: 火锅和川菜推荐。\n\n", context);
+        assertEquals("[S1]\n标题: 成都美食攻略\n标签: 成都、美食\n片段: 火锅和川菜推荐。\n\n", context);
         assertFalse(context.contains("测试作者"));
     }
 

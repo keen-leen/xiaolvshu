@@ -133,7 +133,9 @@ public class RagIndexService {
                             .properties("link", p -> p.keyword(v -> v.index(false)))
                             .properties("tags", p -> p.keyword(v -> v))
                             .properties("embedding", p -> p.denseVector(v -> v
-                                    .dims(dimensions).index(true).similarity("cosine")))));
+                                    .dims(dimensions).index(true)
+                                    // Elasticsearch 8 新客户端使用枚举而非自由字符串，编译期即可发现非法相似度类型。
+                                    .similarity(co.elastic.clients.elasticsearch._types.mapping.DenseVectorSimilarity.Cosine)))));
         } catch (IOException e) {
             throw new IllegalStateException("初始化 Elasticsearch RAG chunk 索引失败", e);
         }
@@ -336,8 +338,9 @@ public class RagIndexService {
                     .source(src -> src.filter(f -> f.excludes("embedding")))
                     .knn(k -> k.field("embedding")
                             .queryVector(vector)
-                            .k((long) limit)
-                            .numCandidates((long) Math.max(numCandidates, limit * 4))
+                            // 新客户端的 k/numCandidates 均为 int；上游配置已限制为正整数，无需再扩大为 long。
+                            .k(limit)
+                            .numCandidates(Math.max(numCandidates, limit * 4))
                             // similarity 是原始 cosine 门槛，不是 Elasticsearch 返回的 _score。
                             .similarity(similarityThreshold)), Map.class);
             return mapCandidates(response);

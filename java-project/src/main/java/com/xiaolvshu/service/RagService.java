@@ -259,12 +259,28 @@ public class RagService {
         }
 
         StringBuilder builder = new StringBuilder();
+        /*
+         * 同一帖子可能召回多个 chunk，它们必须共享一个来源编号；编号按首次出现顺序分配，
+         * 这样最终 refs 按 postId 去重后仍能与模型回答中的 [S1]、[S2] 稳定对应。
+         */
+        Map<Long, String> sourceIds = new LinkedHashMap<>();
+        int nextSourceNumber = 1;
         for (Document doc : docs) {
             if (doc == null || doc.getText() == null || doc.getText().isBlank()) {
                 continue;
             }
             String title = asString(doc.getMetadata().get("title")).trim();
             List<String> tags = parseTags(doc.getMetadata().get("tags"));
+            Long postId = parseLong(doc.getMetadata().get("postId"));
+            String sourceId = postId == null ? null : sourceIds.get(postId);
+            if (sourceId == null) {
+                // 缺失 postId 的异常文档仍分配独立编号，但不会写入映射，避免多个未知来源被错误合并。
+                sourceId = "S" + nextSourceNumber++;
+                if (postId != null) {
+                    sourceIds.put(postId, sourceId);
+                }
+            }
+            builder.append('[').append(sourceId).append("]\n");
             if (!title.isBlank()) {
                 builder.append("标题: ").append(title).append('\n');
             }

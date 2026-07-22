@@ -21,6 +21,9 @@ public class TravelChatResponse {
 
     @Data
     public static class TravelNoteReference {
+        /** 与模型上下文中 S1、S2 一致的稳定来源编号。 */
+        private String sourceId;
+
         private Long postId;
         private String title;
         private String author;

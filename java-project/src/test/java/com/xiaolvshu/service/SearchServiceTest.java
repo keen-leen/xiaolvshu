@@ -1,12 +1,18 @@
 package com.xiaolvshu.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.xiaolvshu.dto.PageResult;
 import com.xiaolvshu.dto.PostResponse;
 import com.xiaolvshu.dto.SearchRequest;
 import com.xiaolvshu.dto.SearchResponse;
 import com.xiaolvshu.entity.Collection;
+import com.xiaolvshu.entity.Follow;
 import com.xiaolvshu.entity.Like;
 import com.xiaolvshu.entity.Post;
+import com.xiaolvshu.entity.PostImage;
+import com.xiaolvshu.entity.PostTag;
+import com.xiaolvshu.entity.PostVideo;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.mapper.CollectionMapper;
 import com.xiaolvshu.mapper.FollowMapper;
@@ -20,6 +26,7 @@ import com.xiaolvshu.mapper.UserMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -43,6 +50,15 @@ class SearchServiceTest {
 
     @BeforeEach
     void setUp() {
+        // MyBatis-Plus 3.5.9+ 将扩展模块拆分后，对 Lambda 包装器的表元数据检查更严格。
+        // 此测试不启动 Spring/MyBatis 容器，因此需要显式注册实际会参与查询的实体。
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "test");
+        assistant.setCurrentNamespace("com.xiaolvshu.mapper.SearchServiceTestMapper");
+        for (Class<?> entity : List.of(PostImage.class, PostVideo.class, PostTag.class,
+                Like.class, Collection.class, Follow.class, User.class)) {
+            TableInfoHelper.initTableInfo(assistant, entity);
+        }
+
         PostMapper postMapper = mock(PostMapper.class);
         UserMapper userMapper = mock(UserMapper.class);
         TagMapper tagMapper = mock(TagMapper.class);

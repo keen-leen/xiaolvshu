@@ -1,6 +1,6 @@
 package com.xiaolvshu.service;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.xiaolvshu.entity.PostVideo;
 import com.xiaolvshu.mapper.PostVideoMapper;
 import lombok.RequiredArgsConstructor;

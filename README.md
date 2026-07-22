@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-- 后端：Java 21、Spring Boot 3.3.5、MyBatis-Plus、JWT
+- 后端：Java 21、Spring Boot 4.1.0、Spring AI 2.0.0、MyBatis-Plus 3.5.17、JWT
 - 前端：Vue 3、Vite、Pinia、Vue Router、Vant、Element Plus
 - 数据与基础设施：MySQL 8、Redis 7、RabbitMQ、Elasticsearch 8.x
 
@@ -59,6 +59,7 @@ npm run dev
 - [社区功能](doc/COMMUNITY.md)
 - [搜索与 RAG](doc/SEARCH_RAG.md)
 - [旅行规划 Agent](doc/TRAVEL_AGENT.md)
+- [Spring AI 2.0 升级报告](doc/SPRING_AI_2_UPGRADE_REPORT.md)
 - [后台管理](doc/ADMIN.md)
 - [Redis 模块](doc/REDIS.md)
 - [重大变更记录](doc/CHANGE_LOG.md)

@@ -4,6 +4,7 @@ import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import SvgIcon from '@/components/SvgIcon.vue'
 import travelAiApi from '@/api/ai'
+import { useTravelAiStream } from '@/composables/useTravelAiStream'
 import { useUserStore } from '@/stores/user'
 import defaultAvatar from '@/assets/imgs/avatar.png'
 
@@ -27,6 +28,7 @@ const chatInput = ref('')
 const loading = ref(false)
 const messageListRef = ref(null)
 const currentStatusText = ref('')
+const stream = useTravelAiStream()
 
 const quickPrompts = [
   '周末想去个离我不太远的地方',
@@ -150,6 +152,11 @@ const sendMessage = async (preset = '') => {
   clearCurrentStage()
   await nextTick()
   scrollToBottom()
+  const signal = stream.begin((text) => {
+    // 仅接收 composable 合并后的文本批次，避免每个模型 token 都触发 Markdown 全量重绘。
+    messages.value[assistantIndex].content += text
+    nextTick(scrollToBottom)
+  })
 
   try {
     await travelAiApi.chat(
@@ -160,8 +167,7 @@ const sendMessage = async (preset = '') => {
       },
       {
         onChunk: (chunk) => {
-          messages.value[assistantIndex].content += extractChunkText(chunk)
-          nextTick(scrollToBottom)
+          stream.append(extractChunkText(chunk))
         },
         onStep: (step) => {
           // thought 是后端专门生成的安全状态文案，不是模型原始推理。
@@ -169,26 +175,50 @@ const sendMessage = async (preset = '') => {
           currentStatusText.value = typeof step?.thought === 'string' ? step.thought.trim() : ''
         },
         onRefs: (refs) => {
+          // refs 按协议位于正文之后，先提交缓冲区尾部文本再展示来源，保持视觉与事件顺序一致。
+          stream.flush()
           messages.value[assistantIndex].references = refs || []
           nextTick(scrollToBottom)
         },
-        onError: (errorText) => {
-          messages.value[assistantIndex].content = errorText || '这次没接上，稍后再试试吧。'
+        onError: (error) => {
+          stream.flush()
+          messages.value[assistantIndex].content = error?.message || '这次没接上，稍后再试试吧。'
         }
-      }
+      },
+      { signal }
     )
 
+    stream.flush()
     if (!messages.value[assistantIndex].content) {
       messages.value[assistantIndex].content = '我整理好了，你还想改改哪里？'
     }
   } catch (error) {
-    messages.value[assistantIndex].content = `这次没接上：${error?.message || '稍后再试试吧'}`
-    messages.value[assistantIndex].references = []
+    stream.flush()
+    if (stream.isAbortError(error)) {
+      // 用户停止或页面卸载属于正常取消；已有部分答案可继续阅读，不应覆盖成红色错误文案。
+      if (!messages.value[assistantIndex].content) {
+        messages.value[assistantIndex].content = '已停止生成。'
+      }
+    } else {
+      messages.value[assistantIndex].content = `这次没接上：${error?.message || '稍后再试试吧'}`
+      messages.value[assistantIndex].references = []
+    }
   } finally {
+    stream.finish()
     loading.value = false
     clearCurrentStage()
     nextTick(scrollToBottom)
   }
+}
+
+const submitOrStop = () => {
+  // 同一个控件在 idle 时发送、loading 时停止，键盘 Enter 与点击行为保持一致。
+  if (loading.value) {
+    stream.stop()
+    clearCurrentStage()
+    return
+  }
+  sendMessage()
 }
 
 const clearConversation = () => {
@@ -303,7 +333,7 @@ const handleAvatarError = (event) => {
                   rel="noopener noreferrer"
                   class="reference-item"
                 >
-                  <span class="reference-number">{{ String(referenceIndex + 1).padStart(2, '0') }}</span>
+                  <span class="reference-number">{{ reference.source_id || `S${referenceIndex + 1}` }}</span>
                   <span class="reference-copy">
                     <strong>{{ reference.title }}</strong>
                     <small>{{ reference.author || '小旅书用户' }}</small>
@@ -324,16 +354,16 @@ const handleAvatarError = (event) => {
             rows="2"
             placeholder="说说你想去哪里，比如：周末去苏州，不想赶行程"
             aria-label="输入旅行问题"
-            @keydown.enter.exact.prevent="sendMessage()"
+            @keydown.enter.exact.prevent="submitOrStop"
           />
           <button
             type="button"
             class="send-button"
-            :disabled="!canSend"
-            aria-label="发送消息"
-            @click="sendMessage()"
+            :disabled="!loading && !canSend"
+            :aria-label="loading ? '停止生成' : '发送消息'"
+            @click="submitOrStop"
           >
-            <SvgIcon :name="loading ? 'loading' : 'right'" :class="{ spinning: loading }" width="19" height="19" color="white" />
+            <SvgIcon :name="loading ? 'close' : 'right'" width="19" height="19" color="white" />
           </button>
         </div>
         <div class="composer-meta">

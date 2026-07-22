@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.xiaolvshu.entity.Post;
+import com.xiaolvshu.entity.PostTag;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.mapper.PostMapper;
 import com.xiaolvshu.mapper.PostTagMapper;
@@ -39,6 +40,7 @@ class SearchIndexServiceTest {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "test");
         assistant.setCurrentNamespace("com.xiaolvshu.mapper.PostMapper");
         TableInfoHelper.initTableInfo(assistant, Post.class);
+        TableInfoHelper.initTableInfo(assistant, PostTag.class);
         postMapper = mock(PostMapper.class);
         PostTagMapper postTagMapper = mock(PostTagMapper.class);
         TagMapper tagMapper = mock(TagMapper.class);

@@ -1,7 +1,11 @@
 import apiConfig from '@/config/api'
 
 export const travelAiApi = {
-  async chat(payload, handlers = {}) {
+  /**
+   * 使用 fetch 读取 POST SSE。原生 EventSource 只能可靠支持 GET，无法携带当前 JSON 请求体，
+   * 因此这里保留手动协议解析，并通过 options.signal 接收页面级 AbortController。
+   */
+  async chat(payload, handlers = {}, options = {}) {
     const token = localStorage.getItem('token')
     const adminToken = localStorage.getItem('admin_token')
 
@@ -15,7 +19,8 @@ export const travelAiApi = {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(!token && adminToken ? { Authorization: `Bearer ${adminToken}` } : {})
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: options.signal
     })
 
     if (!response.ok || !response.body) {
@@ -34,35 +39,45 @@ export const travelAiApi = {
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder('utf-8')
+    // 网络分片可能从任意 UTF-8 字节或 SSE 行中间断开，必须用流式 decoder 和跨 read 缓冲区拼接。
     let buffer = ''
 
+    // done 与 error 都是协议终态；仅依赖 ReadableStream 的 done 会把代理截断误判为正常完成。
+    let terminalEventReceived = false
+
+    const parseJson = (data, fallback) => {
+      try {
+        return JSON.parse(data || '')
+      } catch (_) {
+        return fallback
+      }
+    }
+
     const dispatchEvent = (eventName, data) => {
+      if (eventName === 'meta' && handlers.onMeta) {
+        handlers.onMeta(parseJson(data, {}))
+        return
+      }
       if (eventName === 'chunk' && handlers.onChunk) {
         handlers.onChunk(data)
         return
       }
       if (eventName === 'refs' && handlers.onRefs) {
-        try {
-          handlers.onRefs(JSON.parse(data || '[]'))
-        } catch (e) {
-          handlers.onRefs([])
-        }
+        handlers.onRefs(parseJson(data, []))
         return
       }
       if (eventName === 'step' && handlers.onStep) {
-        try {
-          handlers.onStep(JSON.parse(data || '{}'))
-        } catch (e) {
-          handlers.onStep({ raw: data })
-        }
+        handlers.onStep(parseJson(data, { raw: data }))
         return
       }
       if (eventName === 'error' && handlers.onError) {
-        handlers.onError(data)
+        terminalEventReceived = true
+        handlers.onError(parseJson(data, { code: 'STREAM_ERROR', message: data }))
       }
     }
 
     const extractNextBlock = (text) => {
+      // 同时兼容 LF 和 CRLF；一个 SSE 事件以空行结束，data 允许出现多行。
       const match = text.match(/\r?\n\r?\n/)
       if (!match || match.index == null) {
         return null
@@ -91,12 +106,14 @@ export const travelAiApi = {
         } else if (line.startsWith('data:')) {
           dataLines.push(line.slice(5).trimStart())
         }
+        // id 由浏览器端当前实现忽略，冒号开头的 heartbeat 注释也不会派发为业务事件。
       }
 
       const data = dataLines.join('\n')
       if (eventName === 'done') {
+        terminalEventReceived = true
         if (handlers.onDone) {
-          handlers.onDone()
+          handlers.onDone(parseJson(data, {}))
         }
         return true
       }
@@ -128,8 +145,10 @@ export const travelAiApi = {
       handleBlock(remaining)
     }
 
-    if (handlers.onDone) {
-      handlers.onDone()
+    // 正常协议必须由 done 收口；若代理在事件前截断连接，交给调用方按异常处理，
+    // 避免把不完整答案误标为成功。error 也是终态，因此不会再次抛出截断异常。
+    if (!terminalEventReceived) {
+      throw new Error('流式连接提前结束，请重试')
     }
   }
 }

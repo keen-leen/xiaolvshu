@@ -9,6 +9,7 @@
 - [API.md](API.md)：接口地址、认证规则和端点索引。
 - [DATABASE.md](DATABASE.md)：MySQL 表结构、关系和搜索同步状态。
 - [CHANGE_LOG.md](CHANGE_LOG.md)：只记录影响整体架构或使用方式的重大变更。
+- [SPRING_AI_2_UPGRADE_REPORT.md](SPRING_AI_2_UPGRADE_REPORT.md)：Spring Boot 4、Spring AI 2、兼容迁移和 Agent 重构报告。
 
 ## 功能模块
 

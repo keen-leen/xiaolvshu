@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import travelAiApi from '@/api/ai'
+import { useTravelAiStream } from '@/composables/useTravelAiStream'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -18,6 +19,7 @@ const userStore = useUserStore()
 const loading = ref(false)
 const userInput = ref('')
 const currentStatusText = ref('')
+const stream = useTravelAiStream()
 const messages = ref([
   {
     role: 'assistant',
@@ -120,11 +122,15 @@ const openDialog = () => {
 }
 
 const closeDialog = () => {
+  // 关闭弹窗意味着用户已离开当前输出视图，必须同时中止网络流，避免后台继续消耗模型额度。
+  if (loading.value) {
+    stream.stop()
+  }
   travelAiStore.closeAssistant()
 }
 
 const openFullPage = () => {
-  travelAiStore.closeAssistant()
+  closeDialog()
   router.push('/travel-ai')
 }
 
@@ -201,6 +207,11 @@ const sendMessage = async () => {
   loading.value = true
   currentStatusText.value = ''
   nextTick(scrollToBottom)
+  const signal = stream.begin((text) => {
+    // composable 已把高频 token 合并为约 40ms 一批，此处只做一次响应式写入和滚动。
+    messages.value[assistantIndex].content += text
+    nextTick(scrollToBottom)
+  })
 
   try {
     await travelAiApi.chat(
@@ -211,10 +222,11 @@ const sendMessage = async () => {
       },
       {
         onChunk: (chunk) => {
-          messages.value[assistantIndex].content += extractChunkText(chunk)
-          nextTick(scrollToBottom)
+          stream.append(extractChunkText(chunk))
         },
         onRefs: (refs) => {
+          // refs 是正文后的独立事件；先冲刷剩余 token，保证引用卡片不会先于最后一段正文出现。
+          stream.flush()
           messages.value[assistantIndex].references = refs || []
           nextTick(scrollToBottom)
         },
@@ -223,23 +235,45 @@ const sendMessage = async () => {
           currentStatusText.value = typeof step?.thought === 'string' ? step.thought.trim() : ''
           nextTick(scrollToBottom)
         },
-        onError: (errorText) => {
-          messages.value[assistantIndex].content = errorText || '流式响应失败，请稍后重试'
+        onError: (error) => {
+          stream.flush()
+          messages.value[assistantIndex].content = error?.message || '流式响应失败，请稍后重试'
         }
-      }
+      },
+      { signal }
     )
 
+    stream.flush()
     if (!messages.value[assistantIndex].content) {
       messages.value[assistantIndex].content = '已完成攻略生成。'
     }
   } catch (e) {
-    messages.value[assistantIndex].content = `流式请求失败：${e?.message || '请稍后重试'}`
-    messages.value[assistantIndex].references = []
+    stream.flush()
+    if (stream.isAbortError(e)) {
+      // 主动停止不是故障：保留已经生成的部分答案，仅在尚无正文时显示停止提示。
+      if (!messages.value[assistantIndex].content) {
+        messages.value[assistantIndex].content = '已停止生成。'
+      }
+    } else {
+      messages.value[assistantIndex].content = `流式请求失败：${e?.message || '请稍后重试'}`
+      messages.value[assistantIndex].references = []
+    }
   } finally {
+    stream.finish()
     loading.value = false
     currentStatusText.value = ''
     nextTick(scrollToBottom)
   }
+}
+
+const submitOrStop = () => {
+  // 发送按钮在生成期间复用为停止按钮，避免另设入口造成移动端布局跳动。
+  if (loading.value) {
+    stream.stop()
+    currentStatusText.value = ''
+    return
+  }
+  sendMessage()
 }
 
 const handleAvatarError = (event) => {
@@ -315,7 +349,7 @@ const handleAvatarError = (event) => {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <span class="source-index">{{ String(refIndex + 1).padStart(2, '0') }}</span>
+                  <span class="source-index">{{ ref.source_id || `S${refIndex + 1}` }}</span>
                   <span class="source-content"><strong>{{ ref.title }}</strong><small>{{ ref.author }}</small></span>
                   <SvgIcon name="right" width="13" height="13" color="currentColor" />
                 </a>
@@ -332,10 +366,10 @@ const handleAvatarError = (event) => {
               maxlength="2000"
               placeholder="写下目的地、天数、预算和你在意的事…"
               rows="2"
-              @keydown.enter.exact.prevent="sendMessage"
+              @keydown.enter.exact.prevent="submitOrStop"
             />
-            <button type="button" class="send-btn" :disabled="!canSend" aria-label="发送旅行需求" @click="sendMessage">
-              <SvgIcon :name="loading ? 'loading' : 'right'" :class="{ spinning: loading }" width="18" height="18" color="white" />
+            <button type="button" class="send-btn" :disabled="!loading && !canSend" :aria-label="loading ? '停止生成' : '发送旅行需求'" @click="submitOrStop">
+              <SvgIcon :name="loading ? 'close' : 'right'" width="18" height="18" color="white" />
             </button>
           </div>
           <div class="input-meta"><span>Enter 发送</span><span>回复将参考社区笔记</span></div>

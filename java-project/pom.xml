@@ -8,7 +8,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.5</version>
+        <version>4.1.0</version>
         <relativePath/>
     </parent>
 
@@ -23,7 +23,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-ai.version>1.0.0</spring-ai.version>
+        <spring-ai.version>2.0.0</spring-ai.version>
     </properties>
 
     <dependencyManagement>
@@ -48,8 +48,19 @@
         <!-- MyBatis-Plus -->
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-            <version>3.5.7</version>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+            <version>3.5.17</version>
+        </dependency>
+        <!-- MyBatis-Plus 3.5.9+ 将通用扩展和 SQL 解析器改为可选模块，项目的 ServiceImpl 与分页插件都直接依赖它们。 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-extension</artifactId>
+            <version>3.5.17</version>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>3.5.17</version>
         </dependency>
 
         <!-- Spring Boot Security -->
@@ -102,6 +113,19 @@
             <groupId>com.qcloud</groupId>
             <artifactId>cos_api</artifactId>
             <version>5.6.227</version>
+            <exclusions>
+                <!--
+                    COS SDK 的 KMS 扩展会通过旧版腾讯云公共 SDK 引入 Okio 1.12，
+                    与 Spring AI 2.0 使用的 OkHttp 4.12 / Okio 3.6 二进制不兼容，
+                    启动 OpenAiEmbeddingModel 时会触发 okio.Options NoSuchFieldError。
+                    当前项目只使用普通 COS 上传、删除和 URL 生成功能，不使用 KMS 客户端加密，
+                    因此排除整个未使用的 KMS 扩展比强行让旧 KMS 运行在 Okio 3 上更安全。
+                -->
+                <exclusion>
+                    <groupId>com.tencentcloudapi</groupId>
+                    <artifactId>tencentcloud-sdk-java-kms</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Apache Commons -->
@@ -126,7 +150,13 @@
         <!-- Spring Boot AOP -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
+
+        <!-- Agent 可观测性：导出 Spring AI/Micrometer 的模型、工具和自定义运行指标。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
         <!-- Spring Boot AMQP (RabbitMQ) -->

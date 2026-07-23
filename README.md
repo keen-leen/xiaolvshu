@@ -6,7 +6,7 @@
 
 - 后端：Java 21、Spring Boot 4.1.0、Spring AI 2.0.0、MyBatis-Plus 3.5.17、JWT
 - 前端：Vue 3、Vite、Pinia、Vue Router、Vant、Element Plus
-- 数据与基础设施：MySQL 8、Redis 7、RabbitMQ、Elasticsearch 8.x
+- 数据与基础设施：MySQL 8、Redis 7、RabbitMQ、Elasticsearch 9.4.2
 
 ## 快速开始
 

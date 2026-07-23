@@ -14,7 +14,7 @@
 | Spring AI | 1.0.0 | 2.0.0 | 配置键调整，Agent 使用原生 Tool Calling API |
 | MyBatis-Plus | 3.5.7 Boot 3 starter | 3.5.17 Boot 4 starter | `ServiceImpl` 包名和可选模块发生变化 |
 | Jackson | 2.x | 3.x | Java 包名、Redis 与 RabbitMQ JSON 转换器调整 |
-| Elasticsearch Java Client | 8.x 既有版本 | 随 Boot 4 依赖管理后的 8.x API | dense vector 枚举及 kNN 整数参数签名调整 |
+| Elasticsearch | 8.19.6 服务端 | Java Client 9.4.2 + Elasticsearch 9.4.2 | 主版本对齐；dense vector 枚举及 kNN 整数参数签名调整 |
 
 Java 仍使用 21，MySQL、Redis、RabbitMQ 和 Elasticsearch 的业务职责没有变化。
 

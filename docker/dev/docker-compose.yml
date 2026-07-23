@@ -77,11 +77,23 @@ services:
       - backend
 
   elasticsearch:
-    build:
-      context: ../..
-      dockerfile_inline: |
-        FROM docker.elastic.co/elasticsearch/elasticsearch:8.19.6
-        RUN bin/elasticsearch-plugin install --batch analysis-smartcn
+    # Spring Boot 4.1 / Spring Data Elasticsearch 6.1 使用 Java Client 9.4.2，
+    # 服务端必须保持同主版本。直接声明官方 image 后，`docker compose pull`
+    # 会保留上游镜像名；`xiaolvshu-dev-elasticsearch-1` 只是 Compose 容器名。
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+    entrypoint:
+      - /bin/tini
+      - --
+      - /bin/bash
+      - -c
+      - |
+        # SmartCN 不在 Elasticsearch 官方基础镜像中。首次创建容器时安装，
+        # 普通 restart 会复用容器文件层，因此不会重复下载；recreate 时会重新安装。
+        if ! bin/elasticsearch-plugin list | grep -qx analysis-smartcn; then
+          bin/elasticsearch-plugin install --batch analysis-smartcn
+        fi
+        # 显式回到官方入口，保留 ELASTIC_PASSWORD、单节点模式等官方初始化逻辑。
+        exec /usr/local/bin/docker-entrypoint.sh eswrapper
     restart: unless-stopped
     ports:
       - "127.0.0.1:${ELASTICSEARCH_PORT:-19200}:9200"

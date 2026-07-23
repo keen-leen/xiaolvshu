@@ -7,7 +7,7 @@
 - Maven 3.9 或可用的 Maven Wrapper
 - Node.js 与 npm
 
-开发 Compose 提供 MySQL 8、Redis 7、RabbitMQ 和安装 SmartCN 插件的 Elasticsearch 8.x。
+开发 Compose 提供 MySQL 8、Redis 7、RabbitMQ 和安装 SmartCN 插件的 Elasticsearch 9.4.2。
 
 ## 本地配置
 

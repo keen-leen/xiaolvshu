@@ -1,5 +1,6 @@
 package com.xiaolvshu.service;
 
+import com.xiaolvshu.dto.CommunitySearchResult;
 import com.xiaolvshu.dto.TravelAgentStep;
 import com.xiaolvshu.dto.TravelChatRequest;
 import com.xiaolvshu.dto.TravelChatResponse;
@@ -13,9 +14,12 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Map;
@@ -173,6 +177,70 @@ class TravelAgentServiceSecurityTest {
     }
 
     @Test
+    void shouldDecodeSpringAiCamelCaseToolResultWhenApiMapperUsesSnakeCase() {
+        /*
+         * Spring AI 2.0 的默认工具结果转换器拥有独立 JsonHelper，因此输出 contextText/postId；
+         * 应用对外 ObjectMapper 则按 application.yml 输出 context_text/post_id。这个测试从真实
+         * ToolCallback 生成 responseData，确保以后不会再次用 API Mapper 误读内部工具协议。
+         */
+        RagService ragService = mock(RagService.class);
+        CommunitySearchResult searchResult = new CommunitySearchResult();
+        searchResult.setQuery("杭州攻略");
+        searchResult.setContextText("[S1]\n标题: 西湖一日游\n片段: 早上沿苏堤步行");
+        TravelChatResponse.TravelNoteReference reference = reference(101L, "西湖一日游");
+        searchResult.setReferences(List.of(reference));
+        when(ragService.searchCommunityNotes("杭州攻略", null, List.of(), 5)).thenReturn(searchResult);
+
+        ToolCallback callback = ToolCallbacks.from(new TravelAgentTools(ragService))[0];
+        String responseData = callback.call("{\"query\":\"杭州攻略\",\"interests\":[],\"topK\":5}");
+        assertTrue(responseData.contains("\"contextText\""));
+        assertTrue(responseData.contains("\"postId\""));
+
+        ObjectMapper snakeCaseMapper = JsonMapper.builder()
+                .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                .build();
+        TravelAgentService snakeCaseService = new TravelAgentService(
+                new TravelAgentTools(ragService),
+                chatModel,
+                mock(ToolCallingManager.class),
+                snakeCaseMapper,
+                new SimpleMeterRegistry(),
+                streamExecutor,
+                toolExecutor,
+                scheduler,
+                15,
+                120,
+                3);
+
+        Object toolPayload = ReflectionTestUtils.invokeMethod(snakeCaseService, "toToolPayload", responseData);
+        assertNotNull(toolPayload);
+        assertEquals(searchResult.getContextText(), ReflectionTestUtils.getField(toolPayload, "modelContent"));
+        assertEquals(List.of(reference), ReflectionTestUtils.getField(toolPayload, "references"));
+    }
+
+    @Test
+    void shouldPreserveNoResultAndSafelyHandleEmptyOrMalformedToolResponses() {
+        CommunitySearchResult noResult = new CommunitySearchResult();
+        noResult.setQuery("与旅行无关的问题");
+        noResult.setContextText("未检索到可靠社区笔记");
+        noResult.setReferences(List.of());
+        ToolCallback callback = ToolCallbacks.from(new TravelAgentTools(mockRagService(noResult)))[0];
+        String noResultJson = callback.call("{\"query\":\"与旅行无关的问题\"}");
+
+        Object noResultPayload = ReflectionTestUtils.invokeMethod(service, "toToolPayload", noResultJson);
+        Object emptyPayload = ReflectionTestUtils.invokeMethod(service, "toToolPayload", "  ");
+        Object malformedPayload = ReflectionTestUtils.invokeMethod(service, "toToolPayload", "{broken-json");
+        Object nullPayload = ReflectionTestUtils.invokeMethod(service, "toToolPayload", "null");
+
+        assertEquals("未检索到可靠社区笔记",
+                ReflectionTestUtils.getField(noResultPayload, "modelContent"));
+        assertEquals(List.of(), ReflectionTestUtils.getField(noResultPayload, "references"));
+        assertEquals("工具未返回内容", ReflectionTestUtils.getField(emptyPayload, "modelContent"));
+        assertEquals("{broken-json", ReflectionTestUtils.getField(malformedPayload, "modelContent"));
+        assertEquals("null", ReflectionTestUtils.getField(nullPayload, "modelContent"));
+    }
+
+    @Test
     void shouldDeduplicateReferencesAndAssignStableSourceIds() {
         TravelChatResponse.TravelNoteReference first = reference(1L, "第一条");
         TravelChatResponse.TravelNoteReference duplicate = reference(1L, "重复条目");
@@ -192,5 +260,11 @@ class TravelAgentServiceSecurityTest {
         reference.setPostId(postId);
         reference.setTitle(title);
         return reference;
+    }
+
+    private RagService mockRagService(CommunitySearchResult result) {
+        RagService ragService = mock(RagService.class);
+        when(ragService.searchCommunityNotes(result.getQuery(), null, null, null)).thenReturn(result);
+        return ragService;
     }
 }

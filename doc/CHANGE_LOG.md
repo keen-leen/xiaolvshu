@@ -39,7 +39,7 @@
 ### 统一开发基础设施
 
 - 开发环境统一由 `docker/dev/docker-compose.yml` 管理 MySQL、Redis、RabbitMQ 和 Elasticsearch。
-- Elasticsearch 开发镜像构建时安装匹配版本的 SmartCN 插件。
+- Elasticsearch 开发环境直接使用官方镜像，并在首次创建容器时安装匹配版本的 SmartCN 插件。
 - MySQL 初始化脚本收敛为 `schema.sql` 和 `data.sql` 两份。
 - 提交 `.env.example` 示例配置，真实开发密钥继续由本地忽略文件提供。
 

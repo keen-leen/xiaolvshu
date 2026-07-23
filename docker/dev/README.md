@@ -1,15 +1,16 @@
 # 开发基础设施
 
 本目录包含可提交、可复现的开发环境定义。MySQL、Redis、RabbitMQ 和
-Elasticsearch 由同一个 Compose 工程管理，Elasticsearch 镜像会在构建时安装
-与版本一致的 SmartCN 插件。
+Elasticsearch 由同一个 Compose 工程管理。Compose 直接拉取官方
+Elasticsearch 镜像，并在首次创建容器时安装与版本一致的 SmartCN 插件。
 
 ## 启动
 
 ```bash
 cp docker/dev/.env.example docker/dev/.env
 # 编辑 .env，替换所有 replace_with_* 占位值
-docker compose -f docker/dev/docker-compose.yml up -d --build
+docker compose -f docker/dev/docker-compose.yml pull
+docker compose -f docker/dev/docker-compose.yml up -d
 ```
 
 后端使用独立的本地环境文件：

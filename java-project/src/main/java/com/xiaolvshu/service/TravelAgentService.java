@@ -24,6 +24,7 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.util.JsonHelper;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -75,6 +77,14 @@ public class TravelAgentService {
     private static final String UNTRUSTED_BEGIN = "--- BEGIN UNTRUSTED DATA ---";
     private static final String UNTRUSTED_END = "--- END UNTRUSTED DATA ---";
     private static final Set<String> KNOWN_TOOLS = Set.of("search_community_notes");
+    /*
+     * Spring AI 的 DefaultToolCallResultConverter 使用框架自己的 JsonHelper，字段名保持 Java
+     * camelCase。这里必须使用同一套编解码规则读取 responseData，不能复用应用对外协议的
+     * ObjectMapper：后者由 application.yml 配置为 SNAKE_CASE，会把 contextText 当成未知字段，
+     * 最终将一次真实命中的检索静默降级成“无”。两套 Mapper 分工明确，也避免为了内部工具协议
+     * 修改前端既有的 snake_case SSE/HTTP 契约。
+     */
+    private static final JsonHelper TOOL_RESULT_JSON = new JsonHelper();
 
     private final TravelAgentTools travelAgentTools;
     private final ChatModel chatModel;
@@ -215,6 +225,20 @@ public class TravelAgentService {
                     future.cancel(true);
                     appendFailedToolRound(conversation, acceptedResponse, acceptedCalls, "工具调用超时");
                     addFailedSteps(session, toolResults, stepNo, acceptedCalls, "工具调用超时", started);
+                    break;
+                } catch (ExecutionException e) {
+                    /*
+                     * spring.ai.tools.throw-exception-on-error=true 会让 Spring AI 保留工具失败语义。
+                     * Future 会再包装一层 ExecutionException，此处只记录服务端完整原因，
+                     * 对 SSE 和后续模型则使用受控文案，避免泄露索引名、地址或 Provider 细节。
+                     */
+                    Throwable cause = e.getCause() == null ? e : e.getCause();
+                    log.warn("Agent工具执行失败, runId={}, tools={}: {}",
+                            session.runId(), acceptedCalls.stream().map(AssistantMessage.ToolCall::name).toList(),
+                            cause.getMessage(), cause);
+                    String failureMessage = "社区笔记检索暂时不可用";
+                    appendFailedToolRound(conversation, acceptedResponse, acceptedCalls, failureMessage);
+                    addFailedSteps(session, toolResults, stepNo, acceptedCalls, failureMessage, started);
                     break;
                 } finally {
                     session.clearChildTask(future);
@@ -394,17 +418,26 @@ public class TravelAgentService {
     /**
      * 将工具标准响应拆成“进入模型的受限文本”和“只发给前端的引用”。
      * 引用不重复塞入 toolResult，可减少模型上下文和 SSE 载荷；未知工具文本仍统一清洗限长。
+     *
+     * <p>{@code responseData} 不是 Controller 的 JSON，而是 Spring AI 工具执行器生成的内部
+     * camelCase JSON。生产者与消费者必须使用相同编解码器，否则全局 SNAKE_CASE 配置会让
+     * {@code contextText}、{@code postId} 等字段丢失。解析失败时保留原有的受限文本降级路径，
+     * 既兼容未来直接返回字符串的工具，也不会把未经清洗的内容交给模型。</p>
      */
     private ToolPayload toToolPayload(String responseData) {
         if (responseData == null || responseData.isBlank()) {
             return new ToolPayload("工具未返回内容", Collections.emptyList());
         }
         try {
-            CommunitySearchResult result = objectMapper.readValue(responseData, CommunitySearchResult.class);
+            CommunitySearchResult result = TOOL_RESULT_JSON.fromJson(responseData, CommunitySearchResult.class);
+            if (result == null) {
+                // JSON null 不是有效的工具结果，转入下方受控降级，避免空指针中断 SSE。
+                throw new IllegalStateException("Spring AI工具结果为null");
+            }
             String context = sanitizeUntrustedText(result.getContextText(), MAX_TOOL_RESULT_LENGTH);
             return new ToolPayload(context,
                     result.getReferences() == null ? Collections.emptyList() : result.getReferences());
-        } catch (JacksonException e) {
+        } catch (IllegalStateException e) {
             // 未来的非 RAG 工具可以直接返回受限文本；这里统一限长，避免撑爆模型上下文。
             return new ToolPayload(sanitizeUntrustedText(responseData, MAX_TOOL_RESULT_LENGTH),
                     Collections.emptyList());

@@ -39,6 +39,10 @@ spring:
     password: ${ELASTICSEARCH_PASSWORD}
 
   ai:
+    tools:
+      # Spring AI 默认会把工具异常转换为普通文本响应，调用方无法区分“执行失败”和“成功返回错误文字”。
+      # 开启抛出后，Agent 编排层才能生成 success=false 的 step，并防止模型把异常信息当成可信检索上下文。
+      throw-exception-on-error: true
     openai:
       api-key: ${AI_API_KEY}
       # Spring AI 2.0 的 OpenAI Java SDK 会在 base-url 后追加 /chat/completions。

@@ -26,6 +26,9 @@ final class TravelAgentRunContext {
     private static final Pattern LOCAL_SOURCE_PATTERN = Pattern.compile("\\[S(\\d+)]");
     private static final String UNTRUSTED_BEGIN = "--- BEGIN UNTRUSTED COMMUNITY NOTES ---";
     private static final String UNTRUSTED_END = "--- END UNTRUSTED COMMUNITY NOTES ---";
+    private static final String CITATION_REQUIREMENTS_BEGIN = "--- BEGIN CITATION REQUIREMENTS ---";
+    private static final String CITATION_REQUIREMENTS_END = "--- END CITATION REQUIREMENTS ---";
+    private static final String NO_RELIABLE_NOTES = "未检索到可靠社区笔记";
 
     private final int requestedTopK;
     private final int maxToolCalls;
@@ -68,7 +71,7 @@ final class TravelAgentRunContext {
     String registerSearchResult(CommunitySearchResult result) {
         if (result == null || result.getContextText() == null || result.getContextText().isBlank()) {
             statusConsumer.accept(new AgentStatus("writing", "正在整理回答"));
-            return "未检索到可靠社区笔记";
+            return NO_RELIABLE_NOTES;
         }
 
         List<TravelNoteReference> localReferences = result.getReferences() == null
@@ -83,6 +86,15 @@ final class TravelAgentRunContext {
                     reference.getPostId(), ignored -> copyWithSourceId(reference, referencesByPostId.size() + 1));
             sourceMapping.put("S" + (i + 1), global.getSourceId());
         }
+        /*
+         * RagService 的空结果文本是“未检索到可靠社区笔记”，它本身不是空字符串；因此是否成功不能
+         * 只看 contextText。至少注册到一个带 postId 的引用，才说明模型确实获得了可追溯资料，
+         * 也才允许要求正文生成尾注。这样可以避免无来源时诱导模型虚构 [S1]。
+         */
+        if (sourceMapping.isEmpty()) {
+            statusConsumer.accept(new AgentStatus("writing", "正在整理回答"));
+            return NO_RELIABLE_NOTES;
+        }
 
         Matcher matcher = LOCAL_SOURCE_PATTERN.matcher(result.getContextText());
         StringBuffer rewritten = new StringBuffer();
@@ -96,14 +108,40 @@ final class TravelAgentRunContext {
         /*
          * 社区正文由用户发布，可能故意包含“忽略系统指令”等提示注入文本。
          * 明确的数据边界会随 ToolResponseMessage 一起交给模型，配合系统提示把它限定为引用资料。
+         *
+         * 引用规则由应用生成并放在不可信数据边界之外，而且只在本次工具确实注册到引用时出现。
+         * 合法编号取自整次运行的引用注册表：多次检索时后一次会看到累计集合，既允许继续使用
+         * 前一次资料，又不会因每次 RAG 都从 S1 编号而产生歧义。
          */
         return UNTRUSTED_BEGIN + "\n"
                 + rewritten
-                + "\n" + UNTRUSTED_END;
+                + "\n" + UNTRUSTED_END
+                + "\n\n" + renderCitationRequirements();
     }
 
     List<TravelNoteReference> references() {
         return new ArrayList<>(referencesByPostId.values());
+    }
+
+    /**
+     * 生成仅对成功 RAG 结果可见的最终回答约束。
+     *
+     * <p>尾注采用运行级引用注册表中的真实编号，而不是在提示词中预设数量。模型必须至少使用
+     * 一条检索事实，但只能标注这里列出的编号，并且尾注要紧邻受该来源直接支持的句子。</p>
+     */
+    private String renderCitationRequirements() {
+        String allowedSources = referencesByPostId.values().stream()
+                .map(reference -> "[" + reference.getSourceId() + "]")
+                .reduce((left, right) -> left + "、" + right)
+                .orElseThrow();
+        return CITATION_REQUIREMENTS_BEGIN + "\n"
+                + "本次运行允许使用的尾注仅限：" + allowedSources + "。\n"
+                + "生成最终回答时必须遵守：\n"
+                + "1. 正文至少使用一条上述社区笔记直接支持的具体事实或建议。\n"
+                + "2. 在该事实或建议所在句子的末尾紧邻标注对应尾注，例如 [S1] 或 [S1][S2]。\n"
+                + "3. 只能使用允许集合中实际存在的编号，不得虚构、猜测或引用其他编号。\n"
+                + "4. 每个尾注必须直接支持它前面的内容，不能为了满足格式而随意标注。\n"
+                + CITATION_REQUIREMENTS_END;
     }
 
     private TravelNoteReference copyWithSourceId(TravelNoteReference source, int sourceNumber) {

@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,6 +41,10 @@ class TravelAgentRunContextTest {
 
         assertTrue(firstText.contains("西湖路线来自[S1]"));
         assertTrue(secondText.contains("重复笔记[S1]，新增笔记[S2]"));
+        assertTrue(firstText.contains("本次运行允许使用的尾注仅限：[S1]。"));
+        assertTrue(secondText.contains("本次运行允许使用的尾注仅限：[S1]、[S2]。"));
+        assertTrue(secondText.indexOf("--- END UNTRUSTED COMMUNITY NOTES ---")
+                < secondText.indexOf("--- BEGIN CITATION REQUIREMENTS ---"));
         assertEquals(2, context.references().size());
         assertEquals("S1", context.references().get(0).getSourceId());
         assertEquals("西湖一日游", context.references().get(0).getTitle());
@@ -55,6 +60,19 @@ class TravelAgentRunContextTest {
                 reference(101L, "只有一条")));
 
         assertTrue(text.contains("[来源不可用]"));
+        assertTrue(text.contains("本次运行允许使用的尾注仅限：[S1]。"));
+        assertFalse(text.contains("本次运行允许使用的尾注仅限：[S1]、[S2]"));
+    }
+
+    @Test
+    void shouldNotLoadCitationRequirementsWithoutReliableReferences() {
+        TravelAgentRunContext context = new TravelAgentRunContext(5, 3, ignored -> { });
+
+        String text = context.registerSearchResult(result("未检索到可靠社区笔记"));
+
+        assertEquals("未检索到可靠社区笔记", text);
+        assertFalse(text.contains("CITATION REQUIREMENTS"));
+        assertTrue(context.references().isEmpty());
     }
 
     private CommunitySearchResult result(String contextText, TravelNoteReference... references) {

@@ -21,12 +21,41 @@ POST /ai/travel/chat
 | `TravelAgentConfiguration` | 创建 `ChatClient`、`MessageChatMemoryAdvisor`、`ToolCallingAdvisor` 和消息窗口 |
 | `TravelAgentService` | 返回 SSE Flux、设置请求级 ToolContext、合并模型/工具/心跳事件、处理总超时与终态 |
 | `TravelAgentTools` | 用 `@Tool` 暴露唯一的社区笔记检索能力 |
-| `TravelAgentRunContext` | 限制单次检索次数、统一多次检索的 `[S1]` 编号、收集最终引用 |
+| `TravelAgentRunContext` | 限制单次检索次数、统一多次检索的 `[S1]` 编号、按需生成引用规则并收集最终引用 |
 | `TravelAgentConversationService` | 签发会话 ID、隔离用户、恢复/清空 JDBC ChatMemory、清理过期会话 |
 | `AgentAccessGuard` | 访问者限流和实例级在途请求保护 |
 
 当前仅开放 `search_community_notes`。天气、票务、价格没有真实 Provider，系统提示会要求模型明确
 说明没有实时数据，禁止伪造“已查询”的结果。
+
+## 亮点：RAG 成功后按需加载引用规则
+
+引用约束没有全部固化在系统提示词中。第一次模型请求只携带通用原则和
+`search_community_notes` 的工具定义，让模型先判断当前问题是否需要社区事实；只有工具成功返回
+至少一个可追溯的笔记引用后，`TravelAgentRunContext` 才在工具结果中动态追加具体引用规则：
+
+```text
+第一次模型请求
+  -> 基础系统提示 + 用户问题 + 工具定义
+  -> 模型按需调用 search_community_notes
+  -> 注册并统一来源编号
+  -> 工具结果 = 不可信社区资料 + 应用生成的引用规则 + 本次合法尾注集合
+  -> 模型生成带句末尾注的最终正文
+```
+
+动态规则要求正文至少采用一条检索结果直接支持的事实或建议，并在对应句末标注 `[Sx]`；模型只能
+使用工具结果明确列出的合法编号，不能虚构尾注，也不能把尾注随意标在没有直接依据的内容后面。
+社区正文位于 `UNTRUSTED COMMUNITY NOTES` 边界内，应用生成的引用规则位于边界外，避免社区内容
+被当成指令执行。
+
+合法尾注集合和最终 `refs` 事件共用同一个运行级引用注册表。一次 Agent 运行内多次检索时，
+每次 RAG 从 `[S1]` 开始的局部编号都会转换成稳定的全局编号，并按 `postId` 去重；后续工具结果
+会给模型提供累计合法集合，因此正文 `[Sx]`、前端引用卡片和笔记链接保持一致。空检索结果没有
+有效引用，不会加载引用规则，也不会诱导模型生成不存在的 `[S1]`。
+
+这一设计同时保留了三个特性：普通聊天不承担无关引用提示，RAG 回答具有正文级来源痕迹，多次工具
+调用仍保持来源编号稳定；整个过程由标准 `ToolCallingAdvisor` 工具循环完成，不需要缓冲最终正文，
+因此不会牺牲实时流式输出。
 
 ## 会话记忆
 

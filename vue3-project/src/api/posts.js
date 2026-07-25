@@ -19,6 +19,7 @@ function transformPostData(backendPost) {
     title: backendPost.title,
     content: backendPost.content,
     images: backendPost.images || [],
+    imageAttributions: backendPost.image_attributions || [],
     // 视频相关字段
     video_url: backendPost.video_url,
     cover_url: backendPost.cover_url,
@@ -53,6 +54,7 @@ function transformPostData(backendPost) {
     originalData: {
       content: backendPost.content,
       images: backendPost.images || [],
+      imageAttributions: backendPost.image_attributions || [],
       tags: backendPost.tags || [],
       createdAt: backendPost.created_at,
       userId: backendPost.user_id

@@ -1,7 +1,9 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import DetailCard from '@/components/DetailCard.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
+import { usePostDetailOverlay } from '@/composables/usePostDetailOverlay'
 import { useTravelAiStore } from '@/stores/travelAi'
 import { useUserStore } from '@/stores/user'
 import { renderTravelAiMarkdown } from '@/utils/travelAiMarkdown'
@@ -27,6 +29,14 @@ const userAvatar = computed(() => userStore.userInfo?.avatar || defaultAvatar)
 const userName = computed(() => userStore.userInfo?.nickname || '你')
 const userQuestionCount = computed(() => messages.value.filter(item => item.role === 'user').length)
 const renderMarkdown = renderTravelAiMarkdown
+const {
+  selectedPost,
+  showDetailCard,
+  clickPosition,
+  openingPostId,
+  openPostDetail,
+  closePostDetail
+} = usePostDetailOverlay()
 
 const scrollToBottom = () => {
   if (messageListRef.value) {
@@ -165,13 +175,14 @@ const handleAvatarError = event => {
 
               <div v-if="message.role === 'assistant' && message.references?.length" class="reference-list">
                 <p>这些笔记也许对你有用</p>
-                <a
+                <button
                   v-for="(reference, referenceIndex) in message.references"
                   :key="reference.post_id"
-                  :href="reference.link"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  type="button"
                   class="reference-item"
+                  :disabled="openingPostId !== null"
+                  :aria-busy="openingPostId === String(reference.post_id)"
+                  @click="openPostDetail(reference.post_id, $event)"
                 >
                   <span class="reference-number">{{ reference.source_id || `S${referenceIndex + 1}` }}</span>
                   <span class="reference-copy">
@@ -179,7 +190,7 @@ const handleAvatarError = event => {
                     <small>{{ reference.author || '小旅书用户' }}</small>
                   </span>
                   <SvgIcon name="right" width="14" height="14" color="currentColor" />
-                </a>
+                </button>
               </div>
             </div>
           </article>
@@ -213,6 +224,15 @@ const handleAvatarError = event => {
       </footer>
     </section>
   </main>
+
+  <Teleport to="body">
+    <DetailCard
+      v-if="showDetailCard && selectedPost"
+      :item="selectedPost"
+      :click-position="clickPosition"
+      @close="closePostDetail"
+    />
+  </Teleport>
 </template>
 
 <style scoped>
@@ -767,6 +787,7 @@ const handleAvatarError = event => {
 }
 
 .reference-item {
+  width: 100%;
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 16px;
   align-items: center;
@@ -777,6 +798,9 @@ const handleAvatarError = event => {
   border-radius: 11px;
   color: var(--text-color-secondary);
   background: var(--bg-color-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
   transition: border-color 0.18s ease, transform 0.18s ease;
 }
@@ -784,6 +808,11 @@ const handleAvatarError = event => {
 .reference-item:hover {
   border-color: color-mix(in srgb, var(--primary-color) 36%, var(--border-color-primary));
   transform: translateX(2px);
+}
+
+.reference-item:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 .reference-number {

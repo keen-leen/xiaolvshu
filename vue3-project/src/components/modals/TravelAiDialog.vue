@@ -2,8 +2,10 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
+import DetailCard from '@/components/DetailCard.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import FloatingActionButton from '@/components/FloatingActionButton.vue'
+import { usePostDetailOverlay } from '@/composables/usePostDetailOverlay'
 import { useTravelAiStore } from '@/stores/travelAi'
 import { useUserStore } from '@/stores/user'
 import { renderTravelAiMarkdown } from '@/utils/travelAiMarkdown'
@@ -28,6 +30,18 @@ const userAvatar = computed(() => userStore.userInfo?.avatar || defaultAvatar)
 const userName = computed(() => userStore.userInfo?.nickname || '你')
 const hasConversation = computed(() => messages.value.some((item) => item.role === 'user'))
 const userQuestionCount = computed(() => messages.value.filter((item) => item.role === 'user').length)
+const {
+  selectedPost,
+  showDetailCard,
+  clickPosition,
+  openingPostId,
+  openPostDetail,
+  closePostDetail
+} = usePostDetailOverlay({
+  // 详情卡与旅行助手都是全屏覆盖层。先隐藏助手可避免遮罩叠加和焦点冲突。
+  beforeShow: () => travelAiStore.hideAssistant(),
+  afterClose: () => travelAiStore.openAssistant()
+})
 
 const openDialog = () => {
   travelAiStore.openAssistant()
@@ -170,18 +184,19 @@ const handleAvatarError = (event) => {
 
               <div v-if="item.role === 'assistant' && item.references && item.references.length > 0" class="source-list">
                 <p><span>社区参考</span><small>{{ item.references.length }} 篇笔记</small></p>
-                <a
+                <button
                   v-for="(ref, refIndex) in item.references"
                   :key="ref.post_id"
+                  type="button"
                   class="source-item"
-                  :href="ref.link"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  :disabled="openingPostId !== null"
+                  :aria-busy="openingPostId === String(ref.post_id)"
+                  @click="openPostDetail(ref.post_id, $event)"
                 >
                   <span class="source-index">{{ ref.source_id || `S${refIndex + 1}` }}</span>
                   <span class="source-content"><strong>{{ ref.title }}</strong><small>{{ ref.author }}</small></span>
                   <SvgIcon name="right" width="13" height="13" color="currentColor" />
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -206,6 +221,15 @@ const handleAvatarError = (event) => {
       </div>
     </div>
   </div>
+
+  <Teleport to="body">
+    <DetailCard
+      v-if="showDetailCard && selectedPost"
+      :item="selectedPost"
+      :click-position="clickPosition"
+      @close="closePostDetail"
+    />
+  </Teleport>
 </template>
 
 <style scoped>
@@ -678,6 +702,7 @@ const handleAvatarError = (event) => {
 }
 
 .source-item {
+  width: 100%;
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) 14px;
   align-items: center;
@@ -689,12 +714,20 @@ const handleAvatarError = (event) => {
   padding: 7px 8px;
   color: var(--text-color-secondary);
   background: var(--bg-color-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   transition: border-color 0.18s ease, transform 0.18s ease;
 }
 
 .source-item:hover {
   border-color: color-mix(in srgb, var(--primary-color) 36%, var(--border-color-primary));
   transform: translateX(2px);
+}
+
+.source-item:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 .source-index {

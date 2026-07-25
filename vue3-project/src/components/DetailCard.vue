@@ -84,8 +84,9 @@
           <div class="author-wrapper">
             <div class="author-info">
               <div class="author-avatar-container">
-                <img :src="authorData.avatar" :alt="authorData.name" class="author-avatar "
-                  @click="onUserClick(authorData.id)" v-user-hover="getAuthorUserHoverConfig()" />
+                <img :src="authorData.avatar" :alt="authorData.name" class="author-avatar"
+                  @click="onUserClick(authorData.id)" @error="handleAvatarError"
+                  v-user-hover="getAuthorUserHoverConfig()" />
                 <VerifiedBadge :verified="authorData.verified" size="medium" class="author-verified-badge" />
               </div>
               <div class="author-name-container">
@@ -169,6 +170,26 @@
               <div class="post-meta">
                 <span class="time">{{ postData.time }}</span>
                 <span class="location">{{ postData.location }}</span>
+              </div>
+              <div v-if="currentImageAttribution?.sourceUrl" class="image-credit">
+                <span>当前图片：</span>
+                <a
+                  v-if="currentImageAttribution.photographerUrl"
+                  :href="currentImageAttribution.photographerUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ currentImageAttribution.photographer || 'Pexels 摄影师' }}
+                </a>
+                <span v-else>{{ currentImageAttribution.photographer || 'Pexels 摄影师' }}</span>
+                <span> · </span>
+                <a
+                  :href="currentImageAttribution.sourceUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Photo on Pexels
+                </a>
               </div>
             </div>
 
@@ -783,7 +804,7 @@ const authorData = computed(() => {
   return {
     id: userId,
     name: props.item.nickname || props.item.author || '匿名用户',
-    avatar: props.item.user_avatar || props.item.avatar || new URL('@/assets/imgs/未加载.png', import.meta.url).href,
+    avatar: props.item.user_avatar || props.item.avatar || defaultAvatar,
     verified: props.item.verified || props.item.author_verified || 0,
     isFollowing: followState.followed,
     buttonType: followState.buttonType
@@ -832,6 +853,16 @@ const imageList = computed(() => {
     return [props.item.image]
   }
   return [new URL('@/assets/imgs/未加载.png', import.meta.url).href]
+})
+
+// 详情接口保留旧 images 字符串数组，同时额外返回同顺序的来源对象。
+// 使用当前轮播下标选择署名，避免把 A 图摄影师错误显示到 B 图下面。
+const currentImageAttribution = computed(() => {
+  const attributions = props.item.originalData?.imageAttributions
+    || props.item.imageAttributions
+    || props.item.image_attributions
+    || []
+  return Array.isArray(attributions) ? attributions[currentImageIndex.value] : null
 })
 
 const hasMultipleImages = computed(() => imageList.value.length > 1)
@@ -2651,7 +2682,10 @@ const goToImage = (index) => {
 
 // 头像加载失败处理
 function handleAvatarError(event) {
-  event.target.src = defaultAvatar
+  const image = event.currentTarget
+  if (image && image.src !== defaultAvatar) {
+    image.src = defaultAvatar
+  }
 }
 
 
@@ -3185,6 +3219,23 @@ function handleAvatarError(event) {
   gap: 8px;
   color: var(--text-color-secondary);
   font-size: 14px;
+}
+
+.image-credit {
+  margin-top: 8px;
+  color: var(--text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.image-credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.image-credit a:hover {
+  color: var(--text-color-primary);
 }
 
 .divider {

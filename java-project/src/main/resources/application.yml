@@ -39,9 +39,15 @@ spring:
     password: ${ELASTICSEARCH_PASSWORD}
 
   ai:
+    chat:
+      memory:
+        repository:
+          jdbc:
+            # 业务数据库的结构由仓库 schema.sql 和迁移脚本管理，禁止依赖启动时隐式建表。
+            initialize-schema: never
     tools:
-      # Spring AI 默认会把工具异常转换为普通文本响应，调用方无法区分“执行失败”和“成功返回错误文字”。
-      # 开启抛出后，Agent 编排层才能生成 success=false 的 step，并防止模型把异常信息当成可信检索上下文。
+      # 工具异常必须终止 Advisor 循环，由统一 SSE error 返回安全文案；
+      # 不能把异常转换为普通工具文本后继续让模型把它当作可信检索上下文。
       throw-exception-on-error: true
     openai:
       api-key: ${AI_API_KEY}
@@ -76,13 +82,18 @@ app:
     # SSE 心跳用于穿过代理缓冲并及时发现客户端断开；总超时防止无限占用模型与并发许可。
     heartbeat-seconds: ${AGENT_HEARTBEAT_SECONDS:15}
     run-timeout-seconds: ${AGENT_RUN_TIMEOUT_SECONDS:120}
-    tool-timeout-seconds: ${AGENT_TOOL_TIMEOUT_SECONDS:3}
+    # 标准 ToolCallingAdvisor 管理循环；请求级 ToolContext 用此上限约束真实 RAG 成本。
+    max-tool-calls: ${AGENT_MAX_TOOL_CALLS:3}
     # 只有应用确实部署在可信反向代理后时才能打开，否则客户端可伪造 X-Forwarded-For 绕过限流。
     trust-forwarded-headers: ${AGENT_TRUST_FORWARDED_HEADERS:false}
     rate-limit:
       period-seconds: ${AGENT_RATE_LIMIT_PERIOD_SECONDS:60}
       anonymous-max: ${AGENT_RATE_LIMIT_ANONYMOUS_MAX:5}
       authenticated-max: ${AGENT_RATE_LIMIT_AUTHENTICATED_MAX:20}
+    memory:
+      max-messages: ${AGENT_MEMORY_MAX_MESSAGES:20}
+      retention-days: ${AGENT_MEMORY_RETENTION_DAYS:30}
+      cleanup-cron: "${AGENT_MEMORY_CLEANUP_CRON:0 30 3 * * *}"
 
   jwt:
     secret: ${JWT_SECRET}

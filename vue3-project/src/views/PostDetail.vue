@@ -64,11 +64,7 @@ const askTravelAi = () => {
 
   const title = postData.value.title || '这篇笔记'
   const prompt = `请基于小旅书笔记《${title}》帮我规划一份旅行路线，包含行程安排、预算建议和避坑提醒。`
-  travelAiStore.openAssistant(prompt, {
-    type: 'post',
-    postId: postData.value.id,
-    title
-  })
+  travelAiStore.openAssistant(prompt)
 }
 
 // 获取笔记详情

@@ -7,9 +7,12 @@
 ### 升级到 Spring Boot 4 与 Spring AI 2
 
 - 后端升级到 Spring Boot 4.1.0、Spring AI 2.0.0、MyBatis-Plus 3.5.17 和 Jackson 3。
-- 旅行 Agent 从自定义 JSON 决策协议迁移到 Spring AI 原生 Tool Calling，并继续由应用执行工具白名单、参数、去重和超时控制。
-- SSE 升级到 v2，增加 `meta`、结构化 `done/error`、事件 ID、心跳、总超时和客户端主动取消。
-- 前端保留流式输出，并以 40ms 窗口合并 token，减少 Markdown 重绘。
+- 旅行 Agent 重构为 `ChatClient + MessageChatMemoryAdvisor + ToolCallingAdvisor + @Tool` 标准流程，
+  删除手工工具循环和重复协议 DTO。
+- 新增 MySQL JDBC ChatMemory、后端会话 ID、身份隔离、消息恢复与清空接口。
+- SSE 升级到 v4，Controller 直接返回 Flux，由 Spring MVC 负责订阅、编码和断连取消；
+  删除无消费方的事件 ID，同时保留安全进度、结构化终态、心跳和总超时。
+- 弹窗与完整页面共用一个 Pinia store，并以 40ms 窗口合并 token，减少重复状态和 Markdown 重绘。
 - 完整兼容性、部署检查和回滚说明见 [SPRING_AI_2_UPGRADE_REPORT.md](SPRING_AI_2_UPGRADE_REPORT.md)。
 
 ### 搜索与 RAG 统一迁移到 Elasticsearch

@@ -1,14 +1,20 @@
 import apiConfig from '@/config/api'
 
+const authHeaders = () => {
+  const token = localStorage.getItem('token')
+  const adminToken = localStorage.getItem('admin_token')
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(!token && adminToken ? { Authorization: `Bearer ${adminToken}` } : {})
+  }
+}
+
 export const travelAiApi = {
   /**
    * 使用 fetch 读取 POST SSE。原生 EventSource 只能可靠支持 GET，无法携带当前 JSON 请求体，
    * 因此这里保留手动协议解析，并通过 options.signal 接收页面级 AbortController。
    */
   async chat(payload, handlers = {}, options = {}) {
-    const token = localStorage.getItem('token')
-    const adminToken = localStorage.getItem('admin_token')
-
     const response = await fetch(`${apiConfig.baseURL}/ai/travel/chat`, {
       method: 'POST',
       headers: {
@@ -16,8 +22,7 @@ export const travelAiApi = {
         'Accept': 'text/event-stream, application/json',
         'Cache-Control': 'no-cache',
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(!token && adminToken ? { Authorization: `Bearer ${adminToken}` } : {})
+        ...authHeaders()
       },
       body: JSON.stringify(payload),
       signal: options.signal
@@ -66,8 +71,8 @@ export const travelAiApi = {
         handlers.onRefs(parseJson(data, []))
         return
       }
-      if (eventName === 'step' && handlers.onStep) {
-        handlers.onStep(parseJson(data, { raw: data }))
+      if (eventName === 'status' && handlers.onStatus) {
+        handlers.onStatus(parseJson(data, { code: 'working', message: data }))
         return
       }
       if (eventName === 'error' && handlers.onError) {
@@ -106,7 +111,7 @@ export const travelAiApi = {
         } else if (line.startsWith('data:')) {
           dataLines.push(line.slice(5).trimStart())
         }
-        // id 由浏览器端当前实现忽略，冒号开头的 heartbeat 注释也不会派发为业务事件。
+        // v4 不发送无重连语义的 id；冒号开头的 heartbeat 注释不会派发为业务事件。
       }
 
       const data = dataLines.join('\n')
@@ -149,6 +154,28 @@ export const travelAiApi = {
     // 避免把不完整答案误标为成功。error 也是终态，因此不会再次抛出截断异常。
     if (!terminalEventReceived) {
       throw new Error('流式连接提前结束，请重试')
+    }
+  },
+
+  async messages(conversationId) {
+    const response = await fetch(
+      `${apiConfig.baseURL}/ai/travel/conversations/${encodeURIComponent(conversationId)}/messages`,
+      { headers: { Accept: 'application/json', ...authHeaders() } }
+    )
+    if (!response.ok) {
+      throw new Error(`恢复会话失败(${response.status})`)
+    }
+    const body = await response.json()
+    return body?.data || { conversation_id: conversationId, messages: [] }
+  },
+
+  async clear(conversationId) {
+    const response = await fetch(
+      `${apiConfig.baseURL}/ai/travel/conversations/${encodeURIComponent(conversationId)}`,
+      { method: 'DELETE', headers: { Accept: 'application/json', ...authHeaders() } }
+    )
+    if (!response.ok) {
+      throw new Error(`清空会话失败(${response.status})`)
     }
   }
 }

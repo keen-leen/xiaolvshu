@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaolvshu.dto.CommunitySearchResult;
 import com.xiaolvshu.dto.TravelChatRequest;
-import com.xiaolvshu.dto.TravelChatResponse;
+import com.xiaolvshu.dto.TravelNoteReference;
 import com.xiaolvshu.entity.Post;
 import com.xiaolvshu.entity.PostTag;
 import com.xiaolvshu.entity.Tag;
@@ -295,12 +295,12 @@ public class RagService {
     /**
      * 将向量库 metadata 映射为前端可展示的引用笔记，按 postId 去重。
      */
-    private List<TravelChatResponse.TravelNoteReference> mapReferences(List<Document> docs) {
+    private List<TravelNoteReference> mapReferences(List<Document> docs) {
         if (docs == null || docs.isEmpty()) {
             return Collections.emptyList();
         }
 
-        Map<Long, TravelChatResponse.TravelNoteReference> refsByPostId = new LinkedHashMap<>();
+        Map<Long, TravelNoteReference> refsByPostId = new LinkedHashMap<>();
         for (Document doc : docs) {
             Map<String, Object> metadata = doc.getMetadata();
             Long postId = parseLong(metadata.get("postId"));
@@ -308,7 +308,7 @@ public class RagService {
                 continue;
             }
 
-            TravelChatResponse.TravelNoteReference ref = new TravelChatResponse.TravelNoteReference();
+            TravelNoteReference ref = new TravelNoteReference();
             ref.setPostId(postId);
             ref.setTitle(asString(metadata.get("title")));
             ref.setAuthor(asString(metadata.get("author")));

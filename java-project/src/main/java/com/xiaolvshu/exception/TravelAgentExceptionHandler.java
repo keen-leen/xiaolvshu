@@ -32,4 +32,9 @@ public class TravelAgentExceptionHandler {
         }
         return ResponseEntity.badRequest().body(Result.error(400, message));
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Result<?>> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(Result.error(400, e.getMessage()));
+    }
 }

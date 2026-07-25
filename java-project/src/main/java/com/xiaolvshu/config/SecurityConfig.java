@@ -65,6 +65,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,"/auth/**", "/health").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/ai/travel/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/ai/travel/conversations/**").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/ai/travel/conversations/**").permitAll()
                 // 搜索相关公开接口
                 .requestMatchers(HttpMethod.GET, "/search").permitAll()
                 // 分类相关公开接口

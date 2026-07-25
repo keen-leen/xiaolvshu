@@ -1,35 +1,18 @@
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import SvgIcon from '@/components/SvgIcon.vue'
-import travelAiApi from '@/api/ai'
-import { useTravelAiStream } from '@/composables/useTravelAiStream'
+import { useTravelAiStore } from '@/stores/travelAi'
 import { useUserStore } from '@/stores/user'
+import { renderTravelAiMarkdown } from '@/utils/travelAiMarkdown'
 import defaultAvatar from '@/assets/imgs/avatar.png'
 
 const userStore = useUserStore()
+const travelAiStore = useTravelAiStore()
+const { messages, loading, statusText: currentStatusText } = storeToRefs(travelAiStore)
 
-const md = new MarkdownIt({
-  breaks: true,
-  linkify: true,
-  html: false
-})
-
-const defaultLinkOpen = md.renderer.rules.link_open || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options))
-md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-  tokens[idx].attrSet('target', '_blank')
-  tokens[idx].attrSet('rel', 'noopener noreferrer nofollow')
-  return defaultLinkOpen(tokens, idx, options, env, self)
-}
-
-const messages = ref([])
 const chatInput = ref('')
-const loading = ref(false)
 const messageListRef = ref(null)
-const currentStatusText = ref('')
-const stream = useTravelAiStream()
-
 const quickPrompts = [
   '周末想去个离我不太远的地方',
   '帮我安排三天成都美食之旅',
@@ -43,196 +26,53 @@ const canSend = computed(() => !loading.value && chatInput.value.trim().length >
 const userAvatar = computed(() => userStore.userInfo?.avatar || defaultAvatar)
 const userName = computed(() => userStore.userInfo?.nickname || '你')
 const userQuestionCount = computed(() => messages.value.filter(item => item.role === 'user').length)
+const renderMarkdown = renderTravelAiMarkdown
 
-onMounted(() => {
-  // 侧边栏在桌面端通常已经恢复过用户信息；移动端或直达本页时可能尚未恢复。
-  // 这里只读取 localStorage 中的已有会话，不为了显示头像额外发起网络请求。
+const scrollToBottom = () => {
+  if (messageListRef.value) {
+    messageListRef.value.scrollTop = messageListRef.value.scrollHeight
+  }
+}
+
+onMounted(async () => {
   if (!userStore.userInfo) {
     userStore.initUserInfo()
   }
+  await travelAiStore.hydrate()
+  nextTick(scrollToBottom)
 })
 
-const clearCurrentStage = () => {
-  currentStatusText.value = ''
-}
-
-const normalizeMarkdownText = (raw) => {
-  if (!raw) {
-    return ''
+onUnmounted(() => {
+  if (loading.value) {
+    travelAiStore.stop()
   }
+})
 
-  let text = String(raw)
-    .replace(/\r\n/g, '\n')
-    .replace(/\\n/g, '\n')
-    .replace(/\u00a0/g, ' ')
-
-  text = text.replace(/(^|\n)[ \t]{0,3}＃{1,6}/g, match => match.replace(/＃/g, '#'))
-  text = text.replace(/(^|\n)([ \t]{0,3}#{1,6})([^\s#])/g, '$1$2 $3')
-  return text
-}
-
-const renderMarkdown = (content) => {
-  if (!content) {
-    return ''
-  }
-
-  return DOMPurify.sanitize(md.render(normalizeMarkdownText(content)), {
-    USE_PROFILES: { html: true },
-    ALLOWED_ATTR: ['href', 'target', 'rel', 'title']
-  })
-}
-
-const extractChunkText = (chunk) => {
-  if (typeof chunk !== 'string') {
-    return String(chunk || '')
-  }
-
-  const trimmed = chunk.trim()
-  if (!trimmed) {
-    return ''
-  }
-
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(trimmed)
-      if (typeof parsed === 'string') {
-        return parsed
-      }
-      if (parsed && typeof parsed === 'object') {
-        for (const key of ['content', 'chunk', 'text', 'delta', 'answer', 'message']) {
-          if (typeof parsed[key] === 'string') {
-            return parsed[key]
-          }
-        }
-      }
-    } catch (_) {
-      // 普通文本片段可能恰好以大括号开头，解析失败时应保留原文。
-    }
-  }
-
-  return chunk
-}
-
-const scrollToBottom = () => {
-  if (!messageListRef.value) {
-    return
-  }
-  messageListRef.value.scrollTop = messageListRef.value.scrollHeight
-}
-
-const buildHistory = () => {
-  // history 只包含已完成的旧消息。必须在追加本次用户问题和空助手占位之前调用，
-  // 否则当前问题会同时出现在 message 与 history 中，并增加无意义的模型上下文。
-  return messages.value
-    .filter(item => (item.role === 'user' || item.role === 'assistant') && item.content?.trim())
-    .slice(-8)
-    .map(item => ({ role: item.role, content: item.content }))
-}
+watch(messages, () => nextTick(scrollToBottom), { deep: true })
 
 const sendMessage = async (preset = '') => {
   const content = String(preset || chatInput.value).trim()
-  if (loading.value || !content || content.length > 2000) {
+  if (!content) {
     return
   }
-
-  const history = buildHistory()
   chatInput.value = ''
-  messages.value.push({ role: 'user', content, references: [] })
-
-  const assistantMessage = {
-    role: 'assistant',
-    content: '',
-    references: []
-  }
-  messages.value.push(assistantMessage)
-  const assistantIndex = messages.value.length - 1
-
-  loading.value = true
-  // 首个 step 返回前只展示无文字等待动效，不在前端推测 Agent 尚未执行的步骤。
-  clearCurrentStage()
-  await nextTick()
-  scrollToBottom()
-  const signal = stream.begin((text) => {
-    // 仅接收 composable 合并后的文本批次，避免每个模型 token 都触发 Markdown 全量重绘。
-    messages.value[assistantIndex].content += text
-    nextTick(scrollToBottom)
-  })
-
-  try {
-    await travelAiApi.chat(
-      {
-        message: content,
-        topK: 5,
-        history
-      },
-      {
-        onChunk: (chunk) => {
-          stream.append(extractChunkText(chunk))
-        },
-        onStep: (step) => {
-          // thought 是后端专门生成的安全状态文案，不是模型原始推理。
-          // 页面原样展示该字段，缺失时继续保留无文字等待态，不用 action 拼装替代文案。
-          currentStatusText.value = typeof step?.thought === 'string' ? step.thought.trim() : ''
-        },
-        onRefs: (refs) => {
-          // refs 按协议位于正文之后，先提交缓冲区尾部文本再展示来源，保持视觉与事件顺序一致。
-          stream.flush()
-          messages.value[assistantIndex].references = refs || []
-          nextTick(scrollToBottom)
-        },
-        onError: (error) => {
-          stream.flush()
-          messages.value[assistantIndex].content = error?.message || '这次没接上，稍后再试试吧。'
-        }
-      },
-      { signal }
-    )
-
-    stream.flush()
-    if (!messages.value[assistantIndex].content) {
-      messages.value[assistantIndex].content = '我整理好了，你还想改改哪里？'
-    }
-  } catch (error) {
-    stream.flush()
-    if (stream.isAbortError(error)) {
-      // 用户停止或页面卸载属于正常取消；已有部分答案可继续阅读，不应覆盖成红色错误文案。
-      if (!messages.value[assistantIndex].content) {
-        messages.value[assistantIndex].content = '已停止生成。'
-      }
-    } else {
-      messages.value[assistantIndex].content = `这次没接上：${error?.message || '稍后再试试吧'}`
-      messages.value[assistantIndex].references = []
-    }
-  } finally {
-    stream.finish()
-    loading.value = false
-    clearCurrentStage()
-    nextTick(scrollToBottom)
-  }
+  await travelAiStore.send(content)
 }
 
 const submitOrStop = () => {
-  // 同一个控件在 idle 时发送、loading 时停止，键盘 Enter 与点击行为保持一致。
   if (loading.value) {
-    stream.stop()
-    clearCurrentStage()
-    return
+    travelAiStore.stop()
+  } else {
+    sendMessage()
   }
-  sendMessage()
 }
 
-const clearConversation = () => {
-  if (loading.value) {
-    return
-  }
-  messages.value = []
+const clearConversation = async () => {
+  await travelAiStore.clearConversation()
   chatInput.value = ''
-  clearCurrentStage()
 }
 
-const handleAvatarError = (event) => {
-  // 不论远程头像失效还是用户信息不完整，聊天布局都应保持稳定。
-  // 先移除 error 回调再替换默认图，避免默认资源自身异常时循环触发。
+const handleAvatarError = event => {
   event.target.onerror = null
   event.target.src = defaultAvatar
 }

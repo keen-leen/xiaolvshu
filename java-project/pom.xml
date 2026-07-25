@@ -185,6 +185,14 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
+        <!--
+            旅行 Agent 使用 Spring AI 2.0 官方 JDBC ChatMemory。
+            MySQL 表结构由 docker/dev/mysql/init/schema.sql 管理，生产环境禁止依赖自动建表。
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-chat-memory-repository-jdbc</artifactId>
+        </dependency>
 
         <!-- Elasticsearch：统一承载笔记全文检索与 RAG 向量检索 -->
         <dependency>

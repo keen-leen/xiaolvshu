@@ -364,6 +364,24 @@ CREATE TABLE `users` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `SPRING_AI_CHAT_MEMORY`
+--
+-- Spring AI 2.0 JdbcChatMemoryRepository 官方结构。conversation_id 在官方脚本中为 VARCHAR(36)，
+-- 小旅书会在 UUID 前加入 user/anonymous 身份前缀做会话隔离，因此扩展为 VARCHAR(128)。
+--
+
+DROP TABLE IF EXISTS `SPRING_AI_CHAT_MEMORY`;
+CREATE TABLE `SPRING_AI_CHAT_MEMORY` (
+  `conversation_id` varchar(128) NOT NULL COMMENT '带身份命名空间的Agent会话键',
+  `content` text NOT NULL COMMENT 'Spring AI消息正文',
+  `type` enum('USER','ASSISTANT','SYSTEM','TOOL') NOT NULL COMMENT 'Spring AI消息类型',
+  `timestamp` timestamp NOT NULL COMMENT '消息创建时间',
+  `sequence_id` bigint NOT NULL COMMENT '会话内稳定顺序',
+  KEY `SPRING_AI_CHAT_MEMORY_CONVERSATION_ID_TIMESTAMP_IDX` (`conversation_id`,`timestamp`),
+  KEY `SPRING_AI_CHAT_MEMORY_CONVERSATION_ID_SEQUENCE_ID_IDX` (`conversation_id`,`sequence_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='旅行Agent短期对话记忆';
+
+--
 -- Dumping routines for database 'xiaolvshu'
 --
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

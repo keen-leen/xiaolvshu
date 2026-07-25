@@ -1,111 +1,23 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
-import travelAiApi from '@/api/ai'
-import { useTravelAiStream } from '@/composables/useTravelAiStream'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
 import SvgIcon from '@/components/SvgIcon.vue'
 import FloatingActionButton from '@/components/FloatingActionButton.vue'
 import { useTravelAiStore } from '@/stores/travelAi'
 import { useUserStore } from '@/stores/user'
+import { renderTravelAiMarkdown } from '@/utils/travelAiMarkdown'
 import defaultAvatar from '@/assets/imgs/avatar.png'
 
 const route = useRoute()
 const router = useRouter()
 const travelAiStore = useTravelAiStore()
 const userStore = useUserStore()
+const { messages, loading, statusText: currentStatusText } = storeToRefs(travelAiStore)
 
-const loading = ref(false)
 const userInput = ref('')
-const currentStatusText = ref('')
-const stream = useTravelAiStream()
-const messages = ref([
-  {
-    role: 'assistant',
-    content: '你好，我是小旅书旅行助手。告诉我你的目的地、天数和预算，我会结合社区笔记为你做攻略。',
-    references: []
-  }
-])
-
 const messageListRef = ref(null)
-
-const md = new MarkdownIt({
-  breaks: true,
-  linkify: true,
-  html: false
-})
-
-const defaultLinkOpen = md.renderer.rules.link_open || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options))
-md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-  tokens[idx].attrSet('target', '_blank')
-  tokens[idx].attrSet('rel', 'noopener noreferrer nofollow')
-  return defaultLinkOpen(tokens, idx, options, env, self)
-}
-
-const normalizeMarkdownText = (raw) => {
-  if (!raw) {
-    return ''
-  }
-
-  let text = String(raw)
-    .replace(/\\r\\n/g, '\n')
-    .replace(/\\n/g, '\n')
-    .replace(/\u00a0/g, ' ')
-
-  // 兼容全角井号标题（＃＃＃）
-  text = text.replace(/(^|\n)[ \t]{0,3}＃{1,6}/g, (m) => m.replace(/＃/g, '#'))
-
-  // 兼容“###标题”这种缺少空格的写法
-  text = text.replace(/(^|\n)([ \t]{0,3}#{1,6})([^\s#])/g, '$1$2 $3')
-
-  return text
-}
-
-const extractChunkText = (chunk) => {
-  if (typeof chunk !== 'string') {
-    return String(chunk || '')
-  }
-
-  const trimmed = chunk.trim()
-  if (!trimmed) {
-    return ''
-  }
-
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(trimmed)
-      if (typeof parsed === 'string') {
-        return parsed
-      }
-
-      if (parsed && typeof parsed === 'object') {
-        const candidateKeys = ['content', 'chunk', 'text', 'delta', 'answer', 'message']
-        for (const key of candidateKeys) {
-          if (typeof parsed[key] === 'string') {
-            return parsed[key]
-          }
-        }
-      }
-    } catch (_) {
-      // ignore JSON parse failures and fallback to original chunk
-    }
-  }
-
-  return chunk
-}
-
-const renderAssistantMarkdown = (content) => {
-  if (!content) {
-    return ''
-  }
-
-  const rendered = md.render(normalizeMarkdownText(content))
-  return DOMPurify.sanitize(rendered, {
-    USE_PROFILES: { html: true },
-    ALLOWED_ATTR: ['href', 'target', 'rel', 'title']
-  })
-}
+const renderAssistantMarkdown = renderTravelAiMarkdown
 
 const hiddenOnRoute = computed(() => route.path.startsWith('/admin') || route.path.startsWith('/travel-ai'))
 const showStandaloneTrigger = computed(() => !route.path.startsWith('/explore') && !route.path.startsWith('/search_result'))
@@ -122,15 +34,13 @@ const openDialog = () => {
 }
 
 const closeDialog = () => {
-  // 关闭弹窗意味着用户已离开当前输出视图，必须同时中止网络流，避免后台继续消耗模型额度。
-  if (loading.value) {
-    stream.stop()
-  }
+  // 弹窗与全屏页共享同一个 store，因此关闭时统一由 store 中止流式请求。
   travelAiStore.closeAssistant()
 }
 
 const openFullPage = () => {
-  closeDialog()
+  // 完整页与弹窗共用同一条流，切换展示形态时只隐藏弹窗，不应取消正在生成的回答。
+  travelAiStore.hideAssistant()
   router.push('/travel-ai')
 }
 
@@ -147,7 +57,11 @@ const handleGlobalKeydown = (event) => {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+  // 首次进入时从服务端恢复最近消息；重复调用会由 store 的 hydrated 状态直接跳过。
+  travelAiStore.hydrate()
+})
 onUnmounted(() => window.removeEventListener('keydown', handleGlobalKeydown))
 
 watch(
@@ -166,19 +80,9 @@ watch(open, (visible) => {
   // 发现页和搜索页的共享浮动按钮直接通过 store 打开弹窗。
   // 把滚动复位放在可见状态监听中，才能保证所有入口的打开行为一致。
   if (visible) {
-    nextTick(scrollToBottom)
+    travelAiStore.hydrate().finally(() => nextTick(scrollToBottom))
   }
 })
-
-const buildHistory = () => {
-  return messages.value
-    .filter((item) => (item.role === 'user' || item.role === 'assistant') && item.content?.trim())
-    .slice(-8)
-    .map((item) => ({
-      role: item.role,
-      content: item.content
-    }))
-}
 
 const sendMessage = async () => {
   if (!canSend.value) {
@@ -186,91 +90,16 @@ const sendMessage = async () => {
   }
 
   const content = userInput.value.trim()
-  // 必须在追加本轮用户问题和空助手占位前构建历史，避免当前问题重复进入模型上下文。
-  const history = buildHistory()
   userInput.value = ''
-
-  messages.value.push({
-    role: 'user',
-    content,
-    references: []
-  })
-
-  const assistantMessage = {
-    role: 'assistant',
-    content: '',
-    references: []
-  }
-  messages.value.push(assistantMessage)
-  const assistantIndex = messages.value.length - 1
-
-  loading.value = true
-  currentStatusText.value = ''
   nextTick(scrollToBottom)
-  const signal = stream.begin((text) => {
-    // composable 已把高频 token 合并为约 40ms 一批，此处只做一次响应式写入和滚动。
-    messages.value[assistantIndex].content += text
-    nextTick(scrollToBottom)
-  })
-
-  try {
-    await travelAiApi.chat(
-      {
-        message: content,
-        topK: 5,
-        history
-      },
-      {
-        onChunk: (chunk) => {
-          stream.append(extractChunkText(chunk))
-        },
-        onRefs: (refs) => {
-          // refs 是正文后的独立事件；先冲刷剩余 token，保证引用卡片不会先于最后一段正文出现。
-          stream.flush()
-          messages.value[assistantIndex].references = refs || []
-          nextTick(scrollToBottom)
-        },
-        onStep: (step) => {
-          // thought 是后端生成的安全状态文案；浮窗与完整页面保持同一数据源，不用 action 或工具名拼装替代文字。
-          currentStatusText.value = typeof step?.thought === 'string' ? step.thought.trim() : ''
-          nextTick(scrollToBottom)
-        },
-        onError: (error) => {
-          stream.flush()
-          messages.value[assistantIndex].content = error?.message || '流式响应失败，请稍后重试'
-        }
-      },
-      { signal }
-    )
-
-    stream.flush()
-    if (!messages.value[assistantIndex].content) {
-      messages.value[assistantIndex].content = '已完成攻略生成。'
-    }
-  } catch (e) {
-    stream.flush()
-    if (stream.isAbortError(e)) {
-      // 主动停止不是故障：保留已经生成的部分答案，仅在尚无正文时显示停止提示。
-      if (!messages.value[assistantIndex].content) {
-        messages.value[assistantIndex].content = '已停止生成。'
-      }
-    } else {
-      messages.value[assistantIndex].content = `流式请求失败：${e?.message || '请稍后重试'}`
-      messages.value[assistantIndex].references = []
-    }
-  } finally {
-    stream.finish()
-    loading.value = false
-    currentStatusText.value = ''
-    nextTick(scrollToBottom)
-  }
+  await travelAiStore.send(content)
+  nextTick(scrollToBottom)
 }
 
 const submitOrStop = () => {
   // 发送按钮在生成期间复用为停止按钮，避免另设入口造成移动端布局跳动。
   if (loading.value) {
-    stream.stop()
-    currentStatusText.value = ''
+    travelAiStore.stop()
     return
   }
   sendMessage()

@@ -11,5 +11,5 @@ public class CommunitySearchResult {
 
     private String contextText;
 
-    private List<TravelChatResponse.TravelNoteReference> references;
+    private List<TravelNoteReference> references;
 }

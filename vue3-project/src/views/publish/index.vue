@@ -350,7 +350,7 @@ const openTravelAiDraft = () => {
   const prompt = parts.length
     ? `请帮我把这篇旅行笔记整理成可发布的攻略结构，并补充行程亮点、预算建议和避坑提醒：${parts.join('；')}`
     : '请帮我生成一篇旅行笔记的攻略提纲，包含标题、路线、亮点、预算建议和避坑提醒。'
-  travelAiStore.openAssistant(prompt, { type: 'publish' })
+  travelAiStore.openAssistant(prompt)
 }
 
 const closeTextImageModal = () => {

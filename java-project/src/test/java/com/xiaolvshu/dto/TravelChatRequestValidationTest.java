@@ -5,8 +5,6 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,36 +26,23 @@ class TravelChatRequestValidationTest {
     }
 
     @Test
-    void shouldRejectInvalidHistoryRoleAndTooManyMessages() {
+    void shouldRejectOversizedConversationId() {
         TravelChatRequest request = validRequest();
-        List<TravelChatRequest.ChatMessage> history = new ArrayList<>();
-        for (int i = 0; i < 9; i++) {
-            history.add(message(i == 0 ? "system" : "user", "hello"));
-        }
-        request.setHistory(history);
+        request.setConversationId("x".repeat(37));
 
         Set<ConstraintViolation<TravelChatRequest>> violations = validator.validate(request);
 
-        assertTrue(messages(violations).contains("历史消息不能超过8条"));
-        assertTrue(messages(violations).contains("历史消息角色只能是user或assistant"));
+        assertTrue(messages(violations).contains("conversationId格式不正确"));
     }
 
     @Test
-    void shouldRejectOversizedHistoryTotalButAllowBlankStreamingPlaceholder() {
+    void shouldAllowBackendIssuedConversationId() {
         TravelChatRequest request = validRequest();
-        request.setHistory(List.of(
-                message("user", "x".repeat(2_000)),
-                message("assistant", "x".repeat(2_000)),
-                message("user", "x".repeat(2_000)),
-                message("assistant", "x".repeat(2_000)),
-                message("user", "x".repeat(2_000)),
-                message("assistant", "x".repeat(2_000)),
-                message("user", "x"),
-                message("assistant", "")));
+        request.setConversationId("20b1c884-8e44-4fe9-b7bf-e2b29b1598da");
 
         Set<ConstraintViolation<TravelChatRequest>> violations = validator.validate(request);
 
-        assertTrue(messages(violations).contains("历史消息总长度不能超过12000个字符"));
+        assertTrue(violations.isEmpty());
     }
 
     private TravelChatRequest validRequest() {
@@ -65,13 +50,6 @@ class TravelChatRequestValidationTest {
         request.setMessage("成都三日游");
         request.setTopK(5);
         return request;
-    }
-
-    private TravelChatRequest.ChatMessage message(String role, String content) {
-        TravelChatRequest.ChatMessage message = new TravelChatRequest.ChatMessage();
-        message.setRole(role);
-        message.setContent(content);
-        return message;
     }
 
     private Set<String> messages(Set<ConstraintViolation<TravelChatRequest>> violations) {

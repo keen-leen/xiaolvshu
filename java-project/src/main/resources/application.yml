@@ -83,7 +83,7 @@ app:
     heartbeat-seconds: ${AGENT_HEARTBEAT_SECONDS:15}
     run-timeout-seconds: ${AGENT_RUN_TIMEOUT_SECONDS:120}
     # 标准 ToolCallingAdvisor 管理循环；请求级 ToolContext 用此上限约束真实 RAG 成本。
-    max-tool-calls: ${AGENT_MAX_TOOL_CALLS:3}
+    max-tool-calls: ${AGENT_MAX_TOOL_CALLS:1}
     # 只有应用确实部署在可信反向代理后时才能打开，否则客户端可伪造 X-Forwarded-For 绕过限流。
     trust-forwarded-headers: ${AGENT_TRUST_FORWARDED_HEADERS:false}
     rate-limit:

@@ -43,6 +43,11 @@ class TravelAgentRunContextTest {
         assertTrue(secondText.contains("重复笔记[S1]，新增笔记[S2]"));
         assertTrue(firstText.contains("本次运行允许使用的尾注仅限：[S1]。"));
         assertTrue(secondText.contains("本次运行允许使用的尾注仅限：[S1]、[S2]。"));
+        assertTrue(secondText.contains("尾注是证据标记，不是必须凑齐的格式"));
+        assertTrue(secondText.contains("如果存在与问题直接相关的具体证据，正文必须采用至少一条"));
+        assertTrue(secondText.contains("标题、标签、来源编号或泛化感想只能帮助定位资料"));
+        assertTrue(secondText.contains("如果所有片段都缺少可直接引用的具体信息，不要输出任何 [Sx]"));
+        assertFalse(secondText.contains("正文至少使用一条上述社区笔记"));
         assertTrue(secondText.indexOf("--- END UNTRUSTED COMMUNITY NOTES ---")
                 < secondText.indexOf("--- BEGIN CITATION REQUIREMENTS ---"));
         assertEquals(2, context.references().size());

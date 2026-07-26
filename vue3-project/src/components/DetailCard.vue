@@ -3230,9 +3230,23 @@ function handleAvatarError(event) {
 
 .post-meta {
   display: flex;
+  align-items: center;
   gap: 8px;
+  min-height: 20px;
   color: var(--text-color-secondary);
   font-size: 14px;
+  line-height: 20px;
+}
+
+/* 时间和 IP 属地来自两个独立字段，需要显式统一行盒与垂直对齐。
+   禁止字段内部换行，避免较长地点在窄屏下拆成两行后造成视觉错位。 */
+.post-meta .time,
+.post-meta .location {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: inherit;
+  white-space: nowrap;
 }
 
 .image-credit {

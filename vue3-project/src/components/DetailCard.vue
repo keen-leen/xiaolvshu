@@ -49,7 +49,7 @@
             </video>
           </div>
           <!-- 图片轮播（图文笔记） -->
-          <div v-else class="image-container">
+          <div v-else class="image-container" @wheel="handleImageWheel">
             <div class="image-slider" :style="{ transform: `translateX(-${currentImageIndex * 100}%)` }">
               <img v-for="(image, index) in imageList" :key="index" 
                 :src="showContent ? image : (index === 0 ? props.item.image : '')" 
@@ -2100,6 +2100,79 @@ const nextImage = () => {
   if (currentImageIndex.value < imageList.value.length - 1) {
     currentImageIndex.value++
   }
+}
+
+const IMAGE_WHEEL_THRESHOLD = 40
+const IMAGE_WHEEL_COOLDOWN = 350
+const IMAGE_WHEEL_GESTURE_GAP = 160
+let accumulatedImageWheelDelta = 0
+let lastImageWheelEventAt = 0
+let lastImageWheelSwitchAt = 0
+let isImageWheelGestureLocked = false
+
+/**
+ * 在桌面端图片区域使用纵向滚轮切换图片。
+ *
+ * 浏览器可能用像素、行或页面表示滚轮位移；先统一换算为像素并累积到阈值，
+ * 可以过滤触控板产生的细小抖动。冷却时间略长于轮播动画，避免一次滚动手势
+ * 连续跨过多张图片。到达首尾边界时不阻止默认事件，防止形成滚动陷阱。
+ */
+const handleImageWheel = (event) => {
+  if (imageList.value.length <= 1 || showImageViewer.value) {
+    return
+  }
+
+  let normalizedDelta = event.deltaY
+  if (event.deltaMode === 1) {
+    normalizedDelta *= 16
+  } else if (event.deltaMode === 2) {
+    normalizedDelta *= window.innerHeight
+  }
+
+  if (!Number.isFinite(normalizedDelta) || normalizedDelta === 0) {
+    return
+  }
+
+  const now = performance.now()
+  if (now - lastImageWheelEventAt > IMAGE_WHEEL_GESTURE_GAP) {
+    accumulatedImageWheelDelta = 0
+    isImageWheelGestureLocked = false
+  }
+  lastImageWheelEventAt = now
+  accumulatedImageWheelDelta += normalizedDelta
+
+  const movingForward = accumulatedImageWheelDelta > 0
+  const canSwitch = movingForward
+    ? currentImageIndex.value < imageList.value.length - 1
+    : currentImageIndex.value > 0
+
+  if (!canSwitch) {
+    accumulatedImageWheelDelta = 0
+    return
+  }
+
+  // 指针位于可继续切换的图片区域时，将滚轮手势保留给轮播处理。
+  if (event.cancelable) {
+    event.preventDefault()
+  }
+
+  if (isImageWheelGestureLocked) {
+    accumulatedImageWheelDelta = 0
+    return
+  }
+
+  if (
+    Math.abs(accumulatedImageWheelDelta) < IMAGE_WHEEL_THRESHOLD
+    || now - lastImageWheelSwitchAt < IMAGE_WHEEL_COOLDOWN
+  ) {
+    return
+  }
+
+  event.stopPropagation()
+  movingForward ? nextImage() : prevImage()
+  accumulatedImageWheelDelta = 0
+  lastImageWheelSwitchAt = now
+  isImageWheelGestureLocked = true
 }
 
 // 图片查看器相关方法

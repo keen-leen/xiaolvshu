@@ -48,6 +48,18 @@ public class User implements Serializable {
      */
     @TableField("avatar")
     private String avatar;
+
+    /** 演示头像对应的 Pexels 图片详情页；普通用户上传头像时为空。 */
+    @TableField("avatar_source_url")
+    private String avatarSourceUrl;
+
+    /** 演示头像摄影师；普通用户上传头像时为空。 */
+    @TableField("avatar_photographer")
+    private String avatarPhotographer;
+
+    /** 演示头像摄影师的 Pexels 主页。 */
+    @TableField("avatar_photographer_url")
+    private String avatarPhotographerUrl;
     
     /**
      * 个人简介

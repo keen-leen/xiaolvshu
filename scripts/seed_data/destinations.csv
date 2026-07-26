@@ -1,0 +1,51 @@
+key|category|name|region|latitude|longitude|season|days|highlights|foods|transport|image_queries
+guilin_yangshuo|国内游|桂林阳朔|广西|24.7736|110.4966|4—5月、9—10月|4|漓江;遇龙河;相公山|桂林米粉;啤酒鱼|桂林市区与阳朔之间可乘动车或大巴，县内适合公交、骑行与步行组合|Guilin China;Yangshuo China;Li River Guilin
+dali_lijiang|国内游|大理丽江|云南|25.6065|100.2676|3—5月、9—11月|6|洱海;大理古城;玉龙雪山|喜洲粑粑;腊排骨|大理和丽江之间优先动车，古城内部以步行和公共交通为主|Dali Yunnan China;Lijiang Yunnan China;Erhai Lake
+beijing_heritage|国内游|北京古都|北京|39.9042|116.4074|4—5月、9—10月|5|故宫;天坛;慕田峪长城|北京烤鸭;炸酱面|核心城区使用地铁，长城等远郊景点单独安排一日往返|Forbidden City Beijing;Temple of Heaven Beijing;Great Wall Beijing
+zhangjiajie|国内游|张家界|湖南|29.1171|110.4792|4—6月、9—11月|4|武陵源;天门山;金鞭溪|三下锅;岩耳炖鸡|市区与武陵源分开住宿可减少折返，景区内按环保车和索道线路游览|Zhangjiajie China;Wulingyuan China;Tianmen Mountain
+ili_xinjiang|国内游|伊犁河谷|新疆|43.9771|81.5275|5—8月|7|赛里木湖;那拉提;喀拉峻|手抓肉;烤包子|景点间距离较长，适合合规包车或自驾，并预留天气机动时间|Ili Xinjiang China;Sayram Lake;Nalati grassland
+kyoto_osaka|出境游|京都大阪|日本|35.0116|135.7681|3—5月、10—11月|6|伏见稻荷大社;岚山;大阪城|寿司;大阪烧|城市间使用铁路，市内以轨道交通和步行为主|Kyoto Japan travel;Fushimi Inari;Osaka Castle Japan
+chiang_mai|出境游|清迈|泰国|18.7883|98.9853|11月至次年2月|5|清迈古城;素贴山;宁曼路|泰北咖喱面;芒果糯米饭|古城适合步行，跨区域移动选择正规双条车或网约车|Chiang Mai Thailand;Doi Suthep;Chiang Mai old city
+singapore|出境游|新加坡|新加坡|1.3521|103.8198|全年，避开正午暴晒|5|滨海湾;植物园;牛车水|海南鸡饭;叻沙|轨道交通覆盖主要区域，步行段注意高温和阵雨|Singapore Marina Bay;Singapore Botanic Gardens;Chinatown Singapore
+iceland_ring|出境游|冰岛南岸|冰岛|63.4186|-19.0060|6—9月或冬季极光季|7|黄金圈;黑沙滩;冰川湖|羊肉汤;黑麦面包|天气变化快，自驾需根据路况调整，冬季优先正规小团|Iceland south coast;Iceland waterfall;Jokulsarlon Iceland
+paris|出境游|巴黎|法国|48.8566|2.3522|4—6月、9—10月|5|卢浮宫;塞纳河;蒙马特|可颂;法式洋葱汤|核心区以地铁和步行为主，热门场馆提前预约|Paris France travel;Louvre Paris;Montmartre Paris
+g318|自驾游|川藏线 G318|四川至西藏|30.1428|102.2230|5—6月、9—10月|10|折多山;理塘;然乌湖|牦牛肉;酥油茶|长距离高海拔路线必须检查车辆、关注路况并安排适应海拔的节奏|Sichuan Tibet Highway;G318 China road;Litang Sichuan
+qinggan_loop|自驾游|青甘大环线|青海甘肃|37.3760|97.3740|6—9月|8|青海湖;茶卡盐湖;鸣沙山|手抓羊肉;酿皮|日均里程较长，出发前确认补给点，并避免疲劳驾驶|Qinghai Lake China;Chaka Salt Lake;Dunhuang desert road
+hainan_loop|自驾游|海南环岛|海南|19.1959|109.7453|11月至次年3月|6|万宁海岸;文昌;三亚|清补凉;海南粉|沿海高速与国道组合，热门海湾停车和住宿需提前规划|Hainan China coast;Wanning Hainan;Hainan road trip
+inner_mongolia|自驾游|呼伦贝尔草原|内蒙古|49.2116|119.7657|6—9月|7|莫日格勒河;额尔古纳湿地;满洲里|手把肉;奶茶|草原道路距离长且信号不稳定，离线地图和油量管理很重要|Hulunbuir grassland;Inner Mongolia road;Manzhouli China
+duku_highway|自驾游|独库公路|新疆|43.9440|84.9020|通常6—9月，以实时通行公告为准|5|独山子峡谷;巴音布鲁克;大小龙池|烤肉;抓饭|通行受季节和天气影响，必须以官方路况为准，不把计划排满|Duku Highway Xinjiang;Bayinbuluke Xinjiang;Xinjiang mountain road
+huangshan|徒步登山|黄山|安徽|30.1328|118.1655|3—5月、9—11月|3|迎客松;西海大峡谷;光明顶|黄山烧饼;毛豆腐|提前确认索道和步道安排，轻装并为台阶路预留体力|Huangshan China;Yellow Mountain China;Huangshan sunrise
+wugongshan|徒步登山|武功山|江西|27.4572|114.1602|5—10月|2|高山草甸;金顶;云海|萍乡炒粉;莲花血鸭|天气和山脊风力变化明显，按正规线路行走并准备防雨保暖层|Wugong Mountain China;Wugongshan Jiangxi;Jiangxi mountain meadow
+yubeng|徒步登山|雨崩|云南|28.3955|98.8021|5—6月、9—11月|5|神瀑;冰湖;梅里雪山|藏式火锅;酥油茶|根据体能安排线路，尊重当地习俗，高海拔行程不要赶路|Yubeng Yunnan;Meili Snow Mountain;Yunnan hiking
+siguniang|徒步登山|四姑娘山|四川|31.1065|102.9014|5—6月、9—11月|4|双桥沟;长坪沟;海子沟|牦牛肉汤锅;青稞饼|先适应海拔再增加强度，普通游客不进入需要专业资质的攀登线路|Mount Siguniang China;Siguniangshan Sichuan;Changping Valley
+mount_tai|徒步登山|泰山|山东|36.2550|117.1000|4—5月、9—11月|2|红门;十八盘;玉皇顶|泰山煎饼;豆腐宴|夜爬需照明和保暖，白天路线也要为连续台阶留足时间|Mount Tai China;Taishan Shandong;Mount Tai sunrise
+sanya|海岛度假|三亚|海南|18.2528|109.5119|11月至次年3月|5|亚龙湾;蜈支洲岛;椰梦长廊|椰子鸡;海鲜|海湾之间距离较远，按片区安排每天行程，涉水项目选择正规经营者|Sanya Hainan;Yalong Bay;Sanya beach China
+weizhou|海岛度假|涠洲岛|广西|21.0447|109.1197|4—11月，避开恶劣海况|4|鳄鱼山;滴水丹屏;五彩滩|海鲜;香蕉猪|船班受海况影响，往返行程留出缓冲并遵守岛上交通规则|Weizhou Island China;Weizhou Guangxi;Guangxi island coast
+bali|海岛度假|巴厘岛|印度尼西亚|-8.4095|115.1889|4—10月|6|乌布;乌鲁瓦图;水明漾|脏鸭餐;沙嗲|不同区域车程较长，减少频繁换酒店，水上活动确认保险与资质|Bali Indonesia travel;Ubud Bali;Uluwatu Bali
+phuket|海岛度假|普吉岛|泰国|7.8804|98.3923|11月至次年4月|5|卡塔海滩;普吉老城;攀牙湾|冬阴功;泰式炒河粉|离岛活动以海况为准，选择正规船公司并遵守救生衣要求|Phuket Thailand;Phuket old town;Phang Nga Bay
+semporna|海岛度假|仙本那|马来西亚|4.4811|118.6115|3—10月|5|敦沙卡兰;马布岛;卡帕莱|海鲜;马来椰浆饭|潜水按证照选择项目，不具备资质时只参加合规浮潜活动|Semporna Malaysia;Mabul Island;Tun Sakaran Marine Park
+chengdu_food|美食探店|成都美食|四川|30.5728|104.0668|春秋两季|3|奎星楼街;建设路;玉林|火锅;担担面|按街区安排探店并控制辣度，热门店错峰到访|Chengdu food China;Sichuan hotpot;Chengdu street food
+xian_food|美食探店|西安美食|陕西|34.3416|108.9398|3—5月、9—11月|3|洒金桥;永兴坊;大皮院|肉夹馍;羊肉泡馍|老城内地铁加步行最方便，不必只集中在单一商业街|Xian food China;Xi'an Muslim Quarter;Shaanxi noodles
+guangzhou_food|美食探店|广州早茶|广东|23.1291|113.2644|10月至次年4月|3|西关;北京路;荔湾湖|虾饺;叉烧包|早茶尽量提前取号，老城区适合地铁与步行串联|Guangzhou dim sum;Cantonese food;Guangzhou street food
+changsha_food|美食探店|长沙夜宵|湖南|28.2282|112.9388|春秋两季|3|坡子街;南门口;冬瓜山|臭豆腐;口味虾|夜间探店注意返程交通，连续重口味餐饮要留出休息|Changsha food China;Hunan cuisine;Changsha street food
+chaoshan_food|美食探店|潮汕美食|广东|23.3535|116.6822|10月至次年4月|4|汕头小公园;潮州古城;牌坊街|牛肉火锅;粿条|汕头与潮州可分区住宿，探店按营业时段规划但出发前仍需复核|Chaoshan food;Shantou food China;Chaozhou cuisine
+erhai_stay|民宿酒店|洱海住宿|云南|25.7370|100.2200|3—5月、9—11月|4|大理古城;喜洲;双廊|白族三道茶;喜洲粑粑|先按行程选择古城、海西或海东，不要只凭海景照片判断距离|Erhai Lake hotel;Dali guesthouse Yunnan;Shuanglang Dali
+moganshan_stay|民宿酒店|莫干山住宿|浙江|30.6043|119.8686|4—10月|3|竹海;庾村;山间步道|笋干烧肉;莫干黄芽|民宿分布较散，自驾要确认停车和最后一段山路条件|Moganshan China;Mogan Mountain hotel;Zhejiang mountain village
+lijiang_stay|民宿酒店|丽江古城住宿|云南|26.8721|100.2299|3—5月、9—11月|4|大研古城;束河古镇;黑龙潭|腊排骨;鸡豆凉粉|拖行李时优先古城边缘，确认接送点与夜间噪声情况|Lijiang old town hotel;Lijiang guesthouse;Shuhe Yunnan
+xishuangbanna_stay|民宿酒店|西双版纳雨林住宿|云南|22.0086|100.7977|11月至次年4月|5|中科院植物园;曼听公园;傣族园|菠萝饭;香茅草烤鱼|景洪市区和远郊景点分开安排，选房时核对真实距离与交通|Xishuangbanna hotel;Jinghong Yunnan;Xishuangbanna rainforest
+luhu_lake_stay|民宿酒店|泸沽湖住宿|云南四川交界|27.7000|100.7833|3—6月、9—11月|4|里格半岛;草海;女神湾|摩梭粑粑;猪膘肉|环湖距离较长，住宿要结合日出日落方向和第二天路线选择|Lugu Lake China;Lugu Lake hotel;Lige Peninsula
+xiamen_photo|摄影打卡|厦门旅拍|福建|24.4798|118.0894|10月至次年4月|3|鼓浪屿;沙坡尾;环岛路|沙茶面;海蛎煎|清晨与傍晚安排外景，鼓浪屿步行较多要轻装|Xiamen China photography;Gulangyu Island;Xiamen coast
+hongkong_photo|摄影打卡|香港城市摄影|中国香港|22.3193|114.1694|10月至次年3月|4|太平山;西环;维多利亚港|菠萝包;云吞面|公共交通便捷，机位之间按港岛和九龙分区减少过海折返|Hong Kong skyline;Victoria Harbour Hong Kong;Hong Kong street
+chongqing_photo|摄影打卡|重庆城市摄影|重庆|29.5630|106.5516|3—5月、9—11月|3|洪崖洞;鹅岭二厂;南滨路|重庆小面;火锅|山城步行高差明显，导航距离不能直接等同于体力消耗|Chongqing skyline;Hongya Cave Chongqing;Chongqing street
+qingdao_photo|摄影打卡|青岛海岸摄影|山东|36.0671|120.3826|5—10月|4|八大关;小鱼山;小麦岛|鲅鱼水饺;海菜凉粉|海岸线较长，按光线方向分早晚机位并预留步行时间|Qingdao China coast;Badaguan Qingdao;Qingdao skyline
+suzhou_photo|摄影打卡|苏州园林摄影|江苏|31.2989|120.5853|3—5月、9—11月|3|拙政园;平江路;虎丘|苏式汤面;海棠糕|园林开门后尽早进入，古城内优先地铁、公交和步行|Suzhou garden China;Humble Administrators Garden;Suzhou canal
+quanzhou_budget|穷游攻略|泉州慢游|福建|24.8741|118.6757|10月至次年4月|4|开元寺;西街;蟳埔村|面线糊;姜母鸭|古城景点集中，公交和步行即可覆盖大部分行程|Quanzhou China;Kaiyuan Temple Quanzhou;Quanzhou old city
+datong_budget|穷游攻略|大同古建|山西|40.0768|113.3001|4—6月、8—10月|4|云冈石窟;华严寺;古城墙|刀削面;浑源凉粉|市区古建集中，云冈石窟等远郊景点单独安排|Datong China;Yungang Grottoes;Datong old city
+nanning_budget|穷游攻略|南宁周末游|广西|22.8170|108.3665|10月至次年3月|3|青秀山;三街两巷;邕江|老友粉;柠檬鸭|地铁覆盖核心城区，夜市结束后提前确认返程方式|Nanning China;Qingxiu Mountain;Nanning street
+yanji_budget|穷游攻略|延吉美食周末|吉林|42.9048|129.5132|5—10月或冬季冰雪期|3|延边大学;水上市场;帽儿山|冷面;米肠|城区不大，公交与步行结合，冬季注意保暖和路面情况|Yanji China;Yanbian China;Yanji food
+jingdezhen_budget|穷游攻略|景德镇陶瓷之旅|江西|29.2688|117.1784|3—5月、9—11月|4|御窑博物馆;陶溪川;三宝村|冷粉;碱水粑|场馆和工作室分布不同片区，按开放日组合行程|Jingdezhen China;Jingdezhen ceramics;Taoxichuan Jingdezhen
+shanghai_family|亲子游|上海亲子游|上海|31.2304|121.4737|3—5月、10—11月|4|上海自然博物馆;科技馆;滨江步道|生煎;小笼包|热门场馆按官方渠道预约，每天保留午休和自由活动时间|Shanghai family travel;Shanghai Natural History Museum;Shanghai skyline
+beijing_family|亲子游|北京博物馆亲子游|北京|39.9042|116.4074|4—5月、9—10月|5|中国科学技术馆;国家博物馆;北京动物园|烤鸭;宫廷点心|大型场馆提前预约，同一天只安排一个重点场馆|Beijing museum;China Science and Technology Museum;Beijing Zoo
+zhuhai_family|亲子游|珠海亲子海滨游|广东|22.2710|113.5767|10月至次年4月|4|情侣路;珠海长隆;城市阳台|横琴蚝;海鲜|亲子乐园与市区海滨分开安排，结束时间要给返程留余量|Zhuhai China coast;Zhuhai Chimelong;Zhuhai skyline
+guangzhou_family|亲子游|广州亲子研学|广东|23.1291|113.2644|10月至次年4月|4|广东科学中心;广州动物园;白云山|早茶;云吞面|场馆日与户外日交替，减少连续高强度步行|Guangzhou family travel;Guangdong Science Center;Guangzhou Zoo
+yunnan_family|亲子游|云南自然亲子游|云南|25.0389|102.7183|3—5月、9—11月|6|昆明植物园;大理洱海;石林|过桥米线;鲜花饼|跨城以动车为主，儿童行程避免连续长途和过快海拔变化|Yunnan family travel;Kunming China;Stone Forest Yunnan

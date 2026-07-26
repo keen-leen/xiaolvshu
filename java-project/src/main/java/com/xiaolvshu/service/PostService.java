@@ -491,13 +491,18 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
         List<Long> postIds = posts.stream().map(Post::getId).toList();
 
         // 查找帖子图片
-        Map<Long, List<String>> imageMap = postImageMapper.selectList(
+        List<PostImage> postImages = postImageMapper.selectList(
                 new LambdaQueryWrapper<PostImage>()
-                        .in(PostImage::getPostId, postIds))
-                .stream()
+                        .in(PostImage::getPostId, postIds)
+                        .orderByAsc(PostImage::getPostId, PostImage::getSortOrder));
+        Map<Long, List<String>> imageMap = postImages.stream()
                 .collect(Collectors.groupingBy(
                         PostImage::getPostId,
                         Collectors.mapping(PostImage::getImageUrl, Collectors.toList())));
+        Map<Long, List<ImageAttributionDTO>> attributionMap = postImages.stream()
+                .collect(Collectors.groupingBy(
+                        PostImage::getPostId,
+                        Collectors.mapping(this::toImageAttribution, Collectors.toList())));
 
         // 查找帖子视频
         Map<Long, PostVideo> videoMap = postVideoMapper.selectList(
@@ -577,6 +582,8 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
                         likedSet.contains(post.getId()),
                 collectedSet.contains(post.getId())))
             .peek(response -> response.setLikeCount(postLikeCountMap.getOrDefault(response.getId(), response.getLikeCount())))
+            .peek(response -> response.setImageAttributions(
+                    attributionMap.getOrDefault(response.getId(), Collections.emptyList())))
                 .toList();
 
         return new PageResult<>(postResponses, page, limit, total);
@@ -599,10 +606,11 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
         }
 
         // 获取图片
-        List<String> images = postImageMapper.selectList(
+        List<PostImage> imageEntities = postImageMapper.selectList(
                 new LambdaQueryWrapper<PostImage>()
-                        .eq(PostImage::getPostId, id))
-                .stream()
+                        .eq(PostImage::getPostId, id)
+                        .orderByAsc(PostImage::getSortOrder));
+        List<String> images = imageEntities.stream()
                 .map(PostImage::getImageUrl)
                 .toList();
 
@@ -649,6 +657,7 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
                             .eq(Collection::getPostId, id)) > 0;
         }
         PostResponse response = convertToResponse(post, user, category, images, video, tags, liked, collected);
+        response.setImageAttributions(imageEntities.stream().map(this::toImageAttribution).toList());
         response.setLikeCount(likeService.getPostLikeCount(id));
         return response;
     }
@@ -816,5 +825,25 @@ public class PostService extends ServiceImpl<PostMapper, Post> {
     public PostResponse convertToResponseForSearch(Post post, User user, List<String> images,
             PostVideo video, List<TagDTO> tags, boolean liked, boolean collected) {
         return convertToResponse(post, user, null, images, video, tags, liked, collected);
+    }
+
+    /**
+     * 将持久化来源信息转换为公开响应。
+     *
+     * <p>普通用户上传的旧图片没有来源字段，此时仍返回带 imageUrl 的对象，前端通过 sourceUrl 是否为空
+     * 决定是否展示署名，不会把缺失信息伪装成 Pexels 资源。</p>
+     */
+    private ImageAttributionDTO toImageAttribution(PostImage image) {
+        ImageAttributionDTO attribution = new ImageAttributionDTO();
+        attribution.setImageUrl(image.getImageUrl());
+        attribution.setProvider(image.getProvider());
+        attribution.setProviderAssetId(image.getProviderAssetId());
+        attribution.setPhotographer(image.getPhotographer());
+        attribution.setPhotographerUrl(image.getPhotographerUrl());
+        attribution.setSourceUrl(image.getSourceUrl());
+        attribution.setLicenseName(image.getLicenseName());
+        attribution.setLicenseUrl(image.getLicenseUrl());
+        attribution.setAltText(image.getAltText());
+        return attribution;
     }
 }

@@ -16,7 +16,7 @@
 | `categories` | 帖子分类 |
 | `tags` | 标签 |
 | `posts` | 帖子主体、统计和搜索同步状态 |
-| `post_images` | 帖子图片 |
+| `post_images` | 帖子图片、展示顺序、Pexels 来源与摄影师署名 |
 | `post_videos` | 帖子视频 |
 | `post_tags` | 帖子与标签的多对多关系 |
 | `comments` | 评论和回复 |
@@ -60,6 +60,8 @@ Compose 仅在 MySQL 数据卷首次创建时执行初始化 SQL。应遵守：
 
 - 结构变更直接合并到 `schema.sql`，保证新用户可以一次初始化到当前版本。
 - 开发演示数据写入 `data.sql`，账号密码必须与运行时密码编码方式一致。
+- 演示图片只通过 Pexels API 获取，必须保留 `provider_asset_id`、摄影师、原始页面和许可证字段；生成流程见 [SEED_DATA.md](SEED_DATA.md)。
+- 已初始化的本地数据库先执行 `scripts/migrations/20260725_add_media_attribution.sql` 增加媒体来源字段；随后可清空业务数据并导入重新生成的 `data.sql`。
 - 真实用户数据、生产导出和真实密钥不得写入初始化脚本。
 - 已有数据库升级由维护者结合实际数据单独执行，不能假设重新运行初始化脚本会自动迁移。
 

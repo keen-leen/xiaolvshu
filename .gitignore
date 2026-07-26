@@ -3,6 +3,8 @@
 # Dependencies
 node_modules/
 /.pnpm-store
+__pycache__/
+*.py[cod]
 
 # Build outputs
 /dist
@@ -61,3 +63,6 @@ CLAUDE.md
 
 # doc
 doc/*_PLAN.md
+.pexels_cache/
+scripts/seed_data/.env.local
+.seed_llm_cache/

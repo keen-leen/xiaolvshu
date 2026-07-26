@@ -207,8 +207,19 @@ CREATE TABLE `post_images` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '图片ID',
   `post_id` bigint NOT NULL COMMENT '笔记ID',
   `image_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '图片URL',
+  `sort_order` int NOT NULL DEFAULT '0' COMMENT '同一笔记内的展示顺序，从0开始',
+  `provider` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '图片提供方，演示数据固定为pexels',
+  `provider_asset_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提供方资源ID，用于去重和追溯',
+  `photographer` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '摄影师署名',
+  `photographer_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '摄影师在提供方的主页',
+  `source_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '图片在提供方的原始详情页',
+  `license_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '采集时适用的许可证名称',
+  `license_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '许可证说明页面',
+  `alt_text` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'API返回或人工整理的图片替代文本',
   PRIMARY KEY (`id`),
-  KEY `idx_post_id` (`post_id`)
+  UNIQUE KEY `uk_provider_asset` (`provider`,`provider_asset_id`),
+  KEY `idx_post_id` (`post_id`),
+  KEY `idx_post_sort` (`post_id`,`sort_order`)
 ) ENGINE=InnoDB AUTO_INCREMENT=636 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='笔记图片表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -339,6 +350,9 @@ CREATE TABLE `users` (
   `user_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '小石榴号',
   `nickname` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '昵称',
   `avatar` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '头像URL',
+  `avatar_source_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '演示头像在Pexels的原始页面',
+  `avatar_photographer` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '演示头像摄影师',
+  `avatar_photographer_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '演示头像摄影师Pexels主页',
   `bio` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '个人简介',
   `location` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'IP属地',
   `follow_count` int DEFAULT '0' COMMENT '关注数',

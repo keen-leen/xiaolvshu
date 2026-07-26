@@ -1,0 +1,19 @@
+{
+  "model": "deepseek-v4-pro",
+  "posts": 500,
+  "planned_requests": 100,
+  "estimated_input_tokens": 425000,
+  "estimated_output_tokens": 700000,
+  "estimated_cost_cny": 5.48,
+  "estimated_cost_with_20_percent_retry_cny": 6.57,
+  "input_price_cny_per_million": 3.0,
+  "output_price_cny_per_million": 6.0,
+  "actual_requests": 24,
+  "actual_input_tokens": 19535,
+  "actual_cache_hit_input_tokens": 7808,
+  "actual_output_tokens": 70024,
+  "actual_cost_cny": 0.4555,
+  "generated_batches": 21,
+  "extra_requests": 3,
+  "cached_batches": 79
+}

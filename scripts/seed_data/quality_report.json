@@ -1,0 +1,26 @@
+{
+  "random_seed": 20260725,
+  "posts": 500,
+  "unique_titles": 500,
+  "unique_contents": 500,
+  "category_counts": {
+    "1": 50,
+    "2": 50,
+    "3": 50,
+    "4": 50,
+    "5": 50,
+    "6": 50,
+    "7": 50,
+    "8": 50,
+    "9": 50,
+    "10": 50
+  },
+  "post_images": 1511,
+  "unique_post_images": 1511,
+  "image_duplicate_rate": 0.0,
+  "tag_count": 1293,
+  "comments": 3063,
+  "unique_comments": 3063,
+  "provider": "pexels",
+  "status": "passed"
+}

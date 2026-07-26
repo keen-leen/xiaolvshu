@@ -81,6 +81,13 @@ public class PostResponse {
      * 图片列表
      */
     private List<String> images;
+
+    /**
+     * 图片来源与摄影师署名。
+     *
+     * <p>仅在资源带有来源元数据时返回；{@link #images} 继续保持字符串数组，兼容现有客户端。</p>
+     */
+    private List<ImageAttributionDTO> imageAttributions;
     
     /**
      * 瀑布流展示用的首张图片

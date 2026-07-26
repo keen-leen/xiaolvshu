@@ -1,0 +1,79 @@
+name: Sync infrastructure images to TCR
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tcr-infrastructure-sync
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Mirror ${{ matrix.target }}:${{ matrix.tag }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - source: mysql:8.0
+            target: mysql
+            tag: "8.0"
+          - source: redis:7-alpine
+            target: redis
+            tag: 7-alpine
+          - source: rabbitmq:3-management
+            target: rabbitmq
+            tag: 3-management
+    steps:
+      - name: Log in to Tencent TCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ vars.TCR_REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
+      - name: Pull, retag and push linux/amd64 image
+        shell: bash
+        env:
+          SOURCE_IMAGE: ${{ matrix.source }}
+          TARGET_IMAGE: ${{ vars.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/${{ matrix.target }}:${{ matrix.tag }}
+        run: |
+          set -Eeuo pipefail
+          docker pull --platform linux/amd64 "${SOURCE_IMAGE}"
+          docker tag "${SOURCE_IMAGE}" "${TARGET_IMAGE}"
+          docker push "${TARGET_IMAGE}"
+
+  elasticsearch:
+    name: Build Elasticsearch with SmartCN
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Log in to Tencent TCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ vars.TCR_REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and push Elasticsearch 9.4.2 with SmartCN
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: docker/elasticsearch
+          file: docker/elasticsearch/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: ELASTICSEARCH_VERSION=9.4.2
+          tags: |
+            ${{ vars.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/elasticsearch-smartcn:9.4.2
+            ${{ vars.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/elasticsearch-smartcn:latest
+          cache-from: type=gha,scope=elasticsearch-smartcn
+          cache-to: type=gha,mode=max,scope=elasticsearch-smartcn
+

@@ -16,7 +16,7 @@ import { computed, ref } from 'vue'
 import CrudTable from './components/CrudTable.vue'
 import MessageToast from '@/components/MessageToast.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { apiConfig } from '@/config/api'
+import request from '@/api/request.js'
 
 // 声明组件事件
 const emit = defineEmits(['closeFilter'])
@@ -44,12 +44,8 @@ const handleToastClose = () => {
 // 处理删除确认
 const handleConfirmDelete = async () => {
   try {
-    const response = await fetch(`${apiConfig.baseURL}/admin/audit/${selectedItem.value.id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    })
-    const result = await response.json()
-    if (result.code === 200) {
+    const result = await request.delete(`/admin/audit/${selectedItem.value.id}`)
+    if (result.success) {
       showMessage('删除成功')
       // 刷新页面数据
       location.reload()
@@ -63,20 +59,6 @@ const handleConfirmDelete = async () => {
     showDeleteModal.value = false
     selectedItem.value = null
   }
-}
-
-// 获取认证头
-const getAuthHeaders = () => {
-  const headers = {
-    'Content-Type': 'application/json'
-  }
-
-  const token = localStorage.getItem('admin_token')
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
-  return headers
 }
 
 // 表格列定义
@@ -177,12 +159,8 @@ const handleCustomAction = async ({ action, item }) => {
   try {
     if (action === 'approve') {
       // 审核通过
-      const response = await fetch(`${apiConfig.baseURL}/admin/audit/${item.id}/approve`, {
-        method: 'PUT',
-        headers: getAuthHeaders()
-      })
-      const result = await response.json()
-      if (result.code === 200) {
+      const result = await request.put(`/admin/audit/${item.id}/approve`)
+      if (result.success) {
         showMessage('审核通过成功')
         // 刷新页面数据
         location.reload()
@@ -191,12 +169,8 @@ const handleCustomAction = async ({ action, item }) => {
       }
     } else if (action === 'reject') {
       // 拒绝申请
-      const response = await fetch(`${apiConfig.baseURL}/admin/audit/${item.id}/reject`, {
-        method: 'PUT',
-        headers: getAuthHeaders()
-      })
-      const result = await response.json()
-      if (result.code === 200) {
+      const result = await request.put(`/admin/audit/${item.id}/reject`)
+      if (result.success) {
         showMessage('拒绝申请成功')
         // 刷新页面数据
         location.reload()

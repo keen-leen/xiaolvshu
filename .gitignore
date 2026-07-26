@@ -33,7 +33,9 @@ Thumbs.db
 *.sw?
 .agents
 .codex
-.github
+.github/*
+!.github/workflows/
+!.github/workflows/**
 
 # Environment variables
 .env

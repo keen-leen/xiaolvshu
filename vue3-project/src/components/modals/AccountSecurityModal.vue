@@ -58,6 +58,7 @@ import { useUserStore } from '@/stores/user'
 import SvgIcon from '@/components/SvgIcon.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { watch, ref } from 'vue'
+import request from '@/api/request.js'
 
 const props = defineProps({
   visible: {
@@ -101,15 +102,9 @@ const handleDeleteAccount = () => {
 const confirmDeleteAccount = async () => {
   try {
     // 调用后端API删除用户数据
-    const response = await fetch(`/api/users/${userStore.userInfo.user_id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userStore.token}`
-      }
-    })
+    const response = await request.delete(`/users/${userStore.userInfo.user_id}`)
 
-    if (response.ok) {
+    if (response.success) {
       // 关闭确认弹窗和主弹窗
       showDeleteModal.value = false
       handleClose()
@@ -117,8 +112,7 @@ const confirmDeleteAccount = async () => {
       await userStore.logout()
       window.location.reload()
     } else {
-      const result = await response.json()
-      console.error('注销账号失败:', result.message)
+      console.error('注销账号失败:', response.message)
     }
   } catch (error) {
     console.error('注销账号失败:', error)

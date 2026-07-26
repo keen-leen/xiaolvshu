@@ -60,6 +60,7 @@ import { useUserStore } from '@/stores/user'
 import FollowButton from './FollowButton.vue'
 import ContentRenderer from './ContentRenderer.vue'
 import VerifiedBadge from './VerifiedBadge.vue'
+import defaultAvatar from '@/assets/imgs/avatar.png'
 
 const router = useRouter()
 const followStore = useFollowStore()
@@ -213,9 +214,7 @@ function getFollowingText(user) {
 }
 
 function handleAvatarError(event) {
-  import('@/assets/imgs/avatar.png').then(module => {
-    event.target.src = module.default
-  })
+  event.target.src = defaultAvatar
 }
 
 // 监听用户信息变化，初始化关注状态

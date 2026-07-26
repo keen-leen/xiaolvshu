@@ -7,13 +7,13 @@ import { useRouteUtils } from '@/composables/useRouteUtils'
 import { useUserStore } from '@/stores/user.js'
 import { useNotificationStore } from '@/stores/notification'
 import { useAuthStore } from '@/stores/auth'
+import defaultAvatar from '@/assets/imgs/avatar.png'
 
 const { route, handleExploreClick } = useRouteUtils()
 const userStore = useUserStore()
 const notificationStore = useNotificationStore()
 const authStore = useAuthStore()
 
-const defaultAvatar = new URL('@/assets/imgs/avatar.png', import.meta.url).href
 
 // 从store获取未读通知数量
 const unreadCount = computed(() => notificationStore.unreadCount)
@@ -59,9 +59,7 @@ const handleLoginClick = () => {
 }
 
 function handleAvatarError(event) {
-  import('@/assets/imgs/avatar.png').then(module => {
-    event.target.src = module.default
-  })
+  event.target.src = defaultAvatar
 }
 
 // 初始化用户信息

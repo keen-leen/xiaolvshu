@@ -2,6 +2,9 @@ import axios from 'axios'
 import apiConfig from '@/config/api.js'
 import { HTTP_STATUS, ERROR_MESSAGES } from '@/config/constants.js'
 
+const isAdminRequestUrl = url => typeof url === 'string'
+  && (url.includes('/auth/admin/') || url.startsWith('/admin/') || url.startsWith('/v3/api-docs'))
+
 // 创建axios实例
 const request = axios.create({
   baseURL: apiConfig.baseURL,
@@ -12,7 +15,7 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   config => {
-    const isAdminRequest = config.url && config.url.includes('/auth/admin/')
+    const isAdminRequest = isAdminRequestUrl(config.url)
     const isInAdminPage = window.location.pathname.startsWith('/admin')
 
     if (isAdminRequest || isInAdminPage) {
@@ -42,7 +45,7 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   (response) => {
     // 对于后端返回的 { code, message, data } 格式，转换为前端期望的 { success, message, data } 格式
-    if (response.data && response.data.hasOwnProperty('code')) {
+    if (response.data && Object.prototype.hasOwnProperty.call(response.data, 'code')) {
       return {
         success: response.data.code === HTTP_STATUS.OK,
         message: response.data.message,
@@ -59,22 +62,17 @@ request.interceptors.response.use(
       // 处理特定的HTTP状态码
       let errorMessage = ERROR_MESSAGES.REQUEST_FAILED
       switch (error.response.status) {
-        case HTTP_STATUS.UNAUTHORIZED:
+        case HTTP_STATUS.UNAUTHORIZED: {
           // 未授权，需要区分是会话过期还是未登录状态
-          console.log('检测到401错误，开始处理未授权访问')
-          
           // 判断是管理员还是普通用户
           const isAdminPage = window.location.pathname.startsWith('/admin')
-          const isAdminRequest = error.config?.url?.includes('/auth/admin/')
-          
-          console.log('页面类型判断:', { isAdminPage, isAdminRequest })
+          const isAdminRequest = isAdminRequestUrl(error.config?.url)
           
           if (isAdminPage || isAdminRequest) {
             // 管理员相关请求
             const adminToken = localStorage.getItem('admin_token')
             if (adminToken) {
               // 有token但401，说明是会话过期
-              console.log('管理员会话过期，清除本地存储')
               localStorage.removeItem('admin_token')
               localStorage.removeItem('admin_refresh_token')
               localStorage.removeItem('admin_info')
@@ -92,7 +90,6 @@ request.interceptors.response.use(
             const userToken = localStorage.getItem('token')
             if (userToken) {
               // 有token但401，说明是会话过期
-              console.log('普通用户会话过期，清除本地存储')
               localStorage.removeItem('token')
               localStorage.removeItem('refreshToken')
               localStorage.removeItem('userInfo')
@@ -105,6 +102,7 @@ request.interceptors.response.use(
             }
           }
           break
+        }
         case HTTP_STATUS.FORBIDDEN:
           errorMessage = ERROR_MESSAGES.FORBIDDEN
           break
@@ -120,7 +118,7 @@ request.interceptors.response.use(
       }
 
       // 如果服务器返回了code字段，使用服务器的错误信息
-      if (error.response.data && error.response.data.hasOwnProperty('code')) {
+      if (error.response.data && Object.prototype.hasOwnProperty.call(error.response.data, 'code')) {
         return {
           success: false,
           message: error.response.data.message || errorMessage,

@@ -138,6 +138,7 @@ import VerifiedBadge from '@/components/VerifiedBadge.vue'
 import ContentEditableInput from '@/components/ContentEditableInput.vue'
 import { useScrollLock } from '@/composables/useScrollLock'
 import { useUserStore } from '@/stores/user'
+import request from '@/api/request.js'
 
 const emit = defineEmits(['close'])
 
@@ -231,14 +232,8 @@ const showForm = computed(() => {
 const fetchVerificationStatus = async () => {
   try {
     statusLoading.value = true
-    const response = await fetch('/api/users/verification/status', {
-      headers: {
-        'Authorization': `Bearer ${userStore.token}`
-      }
-    })
-    const result = await response.json()
-
-    if (result.code === 200) {
+    const result = await request.get('/users/verification/status')
+    if (result.success) {
       verificationStatus.value = result.data
     }
   } catch (error) {
@@ -383,21 +378,11 @@ const handleSubmitVerification = async () => {
   try {
     const contentHtml = generateContentHtml()
 
-    const response = await fetch('/api/users/verification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userStore.token}`
-      },
-      body: JSON.stringify({
-        type: form.type,
-        content: contentHtml
-      })
+    const result = await request.post('/users/verification', {
+      type: form.type,
+      content: contentHtml
     })
-
-    const result = await response.json()
-
-    if (result.code === 200 || result.success) {
+    if (result.success) {
       $message.success('认证申请提交成功，请耐心等待审核')
 
       // 重置表单
@@ -436,17 +421,8 @@ const handleRevokeVerification = async () => {
   revokeLoading.value = true
 
   try {
-    const response = await fetch('/api/users/verification/revoke', {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userStore.token}`
-      }
-    })
-
-    const result = await response.json()
-
-    if (result.code === 200 || result.success) {
+    const result = await request.delete('/users/verification/revoke')
+    if (result.success) {
       $message.success('认证申请已撤回')
       // 重新获取认证状态
       await fetchVerificationStatus()

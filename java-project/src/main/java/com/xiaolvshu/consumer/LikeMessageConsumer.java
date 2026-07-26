@@ -5,16 +5,11 @@ import com.xiaolvshu.config.RabbitMQConfig;
 import com.xiaolvshu.dto.LikeMessage;
 import com.xiaolvshu.entity.*;
 import com.xiaolvshu.mapper.*;
-import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.IOException;
 
 /**
  * 点赞消息消费者
@@ -32,30 +27,25 @@ public class LikeMessageConsumer {
     private final NotificationMapper notificationMapper;
 
     @RabbitListener(queues = RabbitMQConfig.LIKE_QUEUE)
-    @Transactional
-    public void handleLikeMessage(LikeMessage message, Channel channel,
-                                   @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
-        try {
-            log.info("收到点赞消息: userId={}, targetId={}, targetType={}, action={}",
-                    message.getUserId(), message.getTargetId(), message.getTargetType(), message.getAction());
+    @Transactional(rollbackFor = Exception.class)
+    public void handleLikeMessage(LikeMessage message) {
+        log.info("收到点赞消息: userId={}, targetId={}, targetType={}, action={}",
+                message.getUserId(), message.getTargetId(), message.getTargetType(), message.getAction());
 
-            if (LikeMessage.ACTION_LIKE.equals(message.getAction())) {
-                handleLike(message);
-            } else if (LikeMessage.ACTION_UNLIKE.equals(message.getAction())) {
-                handleUnlike(message);
-            } else {
-                log.warn("未知的点赞操作类型: {}", message.getAction());
-            }
-
-            // 手动确认消息
-            channel.basicAck(deliveryTag, false);
-            log.info("点赞消息处理成功: userId={}, targetId={}, action={}",
-                    message.getUserId(), message.getTargetId(), message.getAction());
-        } catch (Exception e) {
-            log.error("点赞消息处理失败: {}", e.getMessage(), e);
-            // 拒绝消息，不重新入队（进入死信队列）
-            channel.basicNack(deliveryTag, false, false);
+        if (LikeMessage.ACTION_LIKE.equals(message.getAction())) {
+            handleLike(message);
+        } else if (LikeMessage.ACTION_UNLIKE.equals(message.getAction())) {
+            handleUnlike(message);
+        } else {
+            /*
+             * 未知动作不能当成成功消息静默 ACK。抛出异常后，数据库事务回滚，
+             * AUTO acknowledge 会依据 default-requeue-rejected=false 将消息送入死信队列。
+             */
+            throw new IllegalArgumentException("未知的点赞操作类型: " + message.getAction());
         }
+
+        log.info("点赞消息处理成功: userId={}, targetId={}, action={}",
+                message.getUserId(), message.getTargetId(), message.getAction());
     }
 
     /**
@@ -87,13 +77,11 @@ public class LikeMessageConsumer {
         if (targetType == Like.TARGET_TYPE_POST) {
             Post post = postMapper.selectById(targetId);
             if (post != null) {
-                post.setLikeCount(post.getLikeCount() + 1);
-                postMapper.updateById(post);
+                postMapper.adjustLikeCount(targetId, 1);
                 // 更新作者的获赞数
                 User author = userMapper.selectById(post.getUserId());
                 if (author != null) {
-                    author.setLikeCount(author.getLikeCount() + 1);
-                    userMapper.updateById(author);
+                    userMapper.adjustLikeCount(author.getId(), 1);
                 }
                 // 发送通知（不给自己发通知）
                 if (!userId.equals(post.getUserId())) {
@@ -109,8 +97,7 @@ public class LikeMessageConsumer {
         } else if (targetType == Like.TARGET_TYPE_COMMENT) {
             Comment comment = commentMapper.selectById(targetId);
             if (comment != null) {
-                comment.setLikeCount(comment.getLikeCount() + 1);
-                commentMapper.updateById(comment);
+                commentMapper.adjustLikeCount(targetId, 1);
                 // 发送通知（不给自己发通知）
                 if (!userId.equals(comment.getUserId())) {
                     Notification notification = new Notification();
@@ -151,20 +138,17 @@ public class LikeMessageConsumer {
         if (targetType == Like.TARGET_TYPE_POST) {
             Post post = postMapper.selectById(targetId);
             if (post != null) {
-                post.setLikeCount(Math.max(0, post.getLikeCount() - 1));
-                postMapper.updateById(post);
+                postMapper.adjustLikeCount(targetId, -1);
                 // 减少作者的获赞数
                 User author = userMapper.selectById(post.getUserId());
                 if (author != null) {
-                    author.setLikeCount(Math.max(0, author.getLikeCount() - 1));
-                    userMapper.updateById(author);
+                    userMapper.adjustLikeCount(author.getId(), -1);
                 }
             }
         } else if (targetType == Like.TARGET_TYPE_COMMENT) {
             Comment comment = commentMapper.selectById(targetId);
             if (comment != null) {
-                comment.setLikeCount(Math.max(0, comment.getLikeCount() - 1));
-                commentMapper.updateById(comment);
+                commentMapper.adjustLikeCount(targetId, -1);
             }
         }
     }

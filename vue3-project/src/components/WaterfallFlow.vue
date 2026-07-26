@@ -869,22 +869,14 @@ function onFadeInEnd(item) {
 // 处理头像加载失败
 function handleAvatarError(event) {
     if (event.target) {
-        import('@/assets/imgs/avatar.png').then(module => {
-            if (event.target) {
-                event.target.src = module.default
-            }
-        })
+        event.target.src = defaultAvatar
     }
 }
 
 // 处理封面图加载失败
 function handleImageError(event) {
     if (event.target) {
-        import('@/assets/imgs/未加载.png').then(module => {
-            if (event.target) {
-                event.target.src = module.default
-            }
-        })
+        event.target.src = defaultPlaceholder
     }
 }
 

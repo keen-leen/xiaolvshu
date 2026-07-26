@@ -43,6 +43,7 @@
 </template>
 
 <script setup>
+import { userApi } from '@/api/index.js'
 import { ref, reactive, inject, watch, onMounted } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import { useScrollLock } from '@/composables/useScrollLock'
@@ -116,7 +117,6 @@ const handleChangePassword = async () => {
   loading.value = true
 
   try {
-    const { userApi } = await import('@/api/index.js')
     const userId = props.userInfo.user_id
 
     const result = await userApi.changePassword(userId, {

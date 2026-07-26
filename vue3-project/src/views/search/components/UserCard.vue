@@ -33,7 +33,8 @@ import { useUserStore } from '@/stores/user'
 import FollowButton from '@/components/FollowButton.vue'
 import BaseSkeleton from '@/components/skeleton/BaseSkeleton.vue'
 import VerifiedBadge from '@/components/VerifiedBadge.vue'
-import { userApi } from '@/api/index.js'
+import { postApi, userApi } from '@/api/index.js'
+import defaultAvatar from '@/assets/imgs/avatar.png'
 
 const props = defineProps({
     user: {
@@ -83,9 +84,7 @@ const isCurrentUser = computed(() => {
 })
 // 处理头像加载失败
 function handleAvatarError(event) {
-    import('@/assets/imgs/avatar.png').then(module => {
-        event.target.src = module.default
-    })
+    event.target.src = defaultAvatar
 }
 function formatNumber(num) {
     // 处理null、undefined或非数字值
@@ -156,7 +155,6 @@ const userHoverConfig = computed(() => ({
         // 获取用户的前三个笔记封面图
         let userPostImages = []
         try {
-            const { postApi } = await import('@/api/index.js')
             const postsResponse = await postApi.getUserPosts(userId, { page: 1, limit: 3 })
 
             if (postsResponse && postsResponse.data && postsResponse.data.posts) {

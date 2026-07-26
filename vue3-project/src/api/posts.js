@@ -1,12 +1,11 @@
 import { postApi } from './index.js'
 import request from './request.js'
-import apiConfig from '@/config/api.js'
 import { hasViewedPost, markPostAsViewed } from '@/utils/viewTracker.js'
 
 // 后端统一使用 Jackson SNAKE_CASE，因此嵌套的图片归属 DTO 也会输出 snake_case。
 // 在 API 边界一次性转为前端 camelCase，避免组件分别兼容两套字段名；即使某个位置
 // 缺少归属对象也保留数组下标，确保多图轮播不会把后一张图片的摄影师错配给前一张。
-function transformImageAttribution(attribution) {
+export function transformImageAttribution(attribution) {
   const source = attribution || {}
   return {
     imageUrl: source.image_url,
@@ -22,7 +21,7 @@ function transformImageAttribution(attribution) {
 }
 
 // 转换后端数据格式为前端瀑布流需要的格式
-function transformPostData(backendPost) {
+export function transformPostData(backendPost) {
 
   const likeCount = backendPost.like_count || 0
   const liked = backendPost.liked || false
@@ -104,29 +103,18 @@ export async function getPostList(params = {}) {
     // 如果指定了用户ID和类型（收藏或点赞），获取用户的收藏或点赞内容
     if (userId && type) {
       if (type === 'collections') {
-        // 获取用户收藏的笔记
-        response = await fetch(`${apiConfig.baseURL}/users/${userId}/collections?page=${page}&limit=${limit}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }).then(res => res.json())
-
-        if (response && response.code === 200 && response.data && response.data.collections) {
+        response = await request.get(`/users/${userId}/collections`, { params: { page, limit } })
+        const collections = response?.data?.collections || response?.data?.posts
+        if (response?.success && collections) {
           return {
-            posts: response.data.collections.map(transformPostData),
+            posts: collections.map(transformPostData),
             pagination: response.data.pagination,
             hasMore: response.data.pagination.page < response.data.pagination.pages
           }
         }
       } else if (type === 'likes') {
-        // 获取用户点赞的笔记
-        response = await fetch(`${apiConfig.baseURL}/users/${userId}/likes?page=${page}&limit=${limit}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }).then(res => res.json())
-
-        if (response && response.code === 200 && response.data && response.data.posts) {
+        response = await request.get(`/users/${userId}/likes`, { params: { page, limit } })
+        if (response?.success && response.data?.posts) {
           return {
             posts: response.data.posts.map(transformPostData),
             pagination: response.data.pagination,
@@ -152,14 +140,10 @@ export async function getPostList(params = {}) {
           searchParams.append('sort', sort)
         }
 
-        response = await fetch(`${apiConfig.baseURL}/users/${userId}/posts?${searchParams.toString()}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }).then(res => res.json())
+        response = await request.get(`/users/${userId}/posts?${searchParams.toString()}`)
 
         const userPostsData = response?.data?.posts || response?.data?.list
-        if (response && response.code === 200 && response.data && userPostsData) {
+        if (response?.success && userPostsData) {
           return {
             posts: userPostsData.map(transformPostData),
             pagination: response.data.pagination,
@@ -183,14 +167,10 @@ export async function getPostList(params = {}) {
         searchParams.append('tag', searchTag.trim())
       }
 
-      response = await fetch(`${apiConfig.baseURL}/search?${searchParams.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      }).then(res => res.json())
+      response = await request.get(`/search?${searchParams.toString()}`)
 
       // 适配新的搜索API返回格式 - posts模式返回笔记数据
-      if (response && response.code === 200 && response.data && response.data.posts && response.data.posts.data) {
+      if (response?.success && response.data?.posts?.data) {
         return {
           posts: response.data.posts.data.map(transformPostData),
           pagination: response.data.posts.pagination,

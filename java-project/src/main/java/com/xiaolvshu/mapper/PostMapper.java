@@ -5,6 +5,7 @@ import com.xiaolvshu.entity.Post;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -54,4 +55,20 @@ public interface PostMapper extends BaseMapper<Post> {
               AND (#{type} IS NULL OR p.type = #{type})
             """)
     long countRecommended(@Param("type") Integer type);
+
+    /**
+     * 原子调整点赞数，避免并发消息通过“先读后写”互相覆盖。
+     * GREATEST 保证乱序或重复取消操作不会产生负数。
+     */
+    @Update("UPDATE posts SET like_count = GREATEST(0, like_count + #{delta}) WHERE id = #{id}")
+    int adjustLikeCount(@Param("id") Long id, @Param("delta") int delta);
+
+    /**
+     * 原子调整收藏数。
+     *
+     * <p>收藏接口可能被多个请求同时调用，不能基于先前读取的 Post 对象回写整个计数；
+     * 使用单条 SQL 做增减，并限制最小值为 0，避免并发覆盖和异常负数。</p>
+     */
+    @Update("UPDATE posts SET collect_count = GREATEST(0, collect_count + #{delta}) WHERE id = #{id}")
+    int adjustCollectCount(@Param("id") Long id, @Param("delta") int delta);
 }

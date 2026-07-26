@@ -17,22 +17,36 @@ import path from 'path'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { createSvgIconsPlugin } from 'vite-plugin-svg-icons'
+import { svgSpritePlugin } from './build/viteSvgSprite.js'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
-    // vueDevTools(),
-    createSvgIconsPlugin({
-      iconDirs: [path.resolve(process.cwd(), 'src/assets/icons')],
-      symbolId: 'icon-[name]',
+    svgSpritePlugin({
+      iconDir: path.resolve(process.cwd(), 'src/assets/icons'),
+      symbolPrefix: 'icon'
     }),
   ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        /*
+         * 稳定的第三方依赖单独缓存。页面已经按路由拆分，但 Vue、编辑器和 Markdown
+         * 依赖仍会被 Rollup 汇入共享入口；显式分组可避免一次业务改动让整包缓存失效。
+         */
+        manualChunks: {
+          'vue-vendor': ['vue', 'pinia', 'vue-router', '@vueuse/core', 'axios'],
+          'editor-vendor': ['cropperjs', 'vue3-emoji-picker'],
+          'markdown-vendor': ['markdown-it', 'dompurify']
+        }
+      }
+    }
   },
   server: {
   /* allowedHosts: [   //添加白名单域名，手动部署取消前面的注释把qq.com替换成你的白名单域名

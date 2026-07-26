@@ -74,7 +74,7 @@ cd java-project
 其他命令：
 
 ```bash
-mvn test
+mvn clean test
 mvn clean package -DskipTests
 ```
 
@@ -91,8 +91,16 @@ npm run dev
 构建命令：
 
 ```bash
+npm run lint
+npm run test
 npm run build
 ```
+
+`main` 分支和 Pull Request 会由 `.github/workflows/ci.yml` 自动执行以上后端与前端检查。
+
+管理员登录后可在 `/admin/api-docs` 查看由后端实时生成的 OpenAPI 接口清单。
+后端规范地址为 `/v3/api-docs`，该地址与其他管理接口一样要求 `ROLE_ADMIN`；
+生产环境可设置 `API_DOCS_ENABLED=false` 完全关闭文档生成。
 
 ## 项目目录
 

@@ -9,7 +9,7 @@ import UserList from './components/UserList.vue'
 import WaterfallFlow from '@/components/WaterfallFlow.vue'
 import LoadingSpinner from '@/components/spinner/LoadingSpinner.vue'
 import SearchFloatingBtn from './components/SearchFloatingBtn.vue'
-import apiConfig from '@/config/api.js'
+import request from '@/api/request.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,15 +93,13 @@ async function searchContent(type = 'all', page = 1, limit = 20) {
             params.append('tag', selectedTag.value.trim())
         }
 
-        const response = await fetch(`${apiConfig.baseURL}/search?${params.toString()}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-        }).then(res => res.json())
+        const response = await request.get('/search', {
+            params: Object.fromEntries(params.entries())
+        })
 
 
 
-        if (response && response.code === 200 && response.data) {
+        if (response?.success && response.data) {
             searchResults.value = response.data
 
             if (response.data.tagStats) {

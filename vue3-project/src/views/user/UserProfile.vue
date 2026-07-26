@@ -14,6 +14,7 @@ import ContentRenderer from '@/components/ContentRenderer.vue'
 import BackToTopButton from '@/components/BackToTopButton.vue'
 import ImageViewer from '@/components/ImageViewer.vue'
 import VerifiedBadge from '@/components/VerifiedBadge.vue'
+import defaultAvatar from '@/assets/imgs/avatar.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,7 +22,6 @@ const navigationStore = useNavigationStore()
 const userStore = useUserStore()
 const followStore = useFollowStore()
 
-const defaultAvatar = new URL('@/assets/imgs/avatar.png', import.meta.url).href
 const userId = ref(route.params.userId)
 const loading = ref(true)
 
@@ -203,9 +203,7 @@ const getFollowStatus = async () => {
 
 // 处理头像加载失败
 function handleAvatarError(event) {
-  import('@/assets/imgs/avatar.png').then(module => {
-    event.target.src = module.default
-  })
+  event.target.src = defaultAvatar
 }
 
 // 点击头像预览

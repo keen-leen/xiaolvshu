@@ -1,38 +1,39 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import layout from '@/views/layout/index.vue'
-import explore from '@/views/explore/index.vue'
-import publish from '@/views/publish/index.vue'
-import notification from '@/views/notification/index.vue'
-import user from '@/views/user/index.vue'
-import userProfile from '@/views/user/UserProfile.vue'
-import FollowList from '@/views/user/FollowList.vue'
-import ChannelPage from '@/views/explore/ChannelPage.vue'
-import PostDetail from '@/views/PostDetail.vue'
-import SearchResult from '@/views/search/SearchResult.vue'
-import PostManagementPage from '@/views/post-management/index.vue'
-import DraftBoxPage from '@/views/draft-box/index.vue'
-import TravelAiPage from '@/views/travel-ai/index.vue'
-import NotFound from '@/views/NotFound.vue'
 import { getValidChannelPaths } from '@/config/channels'
 
-// 后台管理系统组件
-import AdminLogin from '@/views/admin/AdminLogin.vue'
-import AdminLayout from '@/views/admin/AdminLayout.vue'
-import ApiDocs from '@/views/admin/ApiDocs.vue'
-import AdminMonitor from '@/views/admin/AdminMonitor.vue'
-import UserManagement from '@/views/admin/UserManagement.vue'
-import PostManagement from '@/views/admin/PostManagement.vue'
-import CommentManagement from '@/views/admin/CommentManagement.vue'
-import CategoryManagement from '@/views/admin/CategoryManagement.vue'
-import TagManagement from '@/views/admin/TagManagement.vue'
-import LikeManagement from '@/views/admin/LikeManagement.vue'
-import CollectionManagement from '@/views/admin/CollectionManagement.vue'
-import FollowManagement from '@/views/admin/FollowManagement.vue'
-import NotificationManagement from '@/views/admin/NotificationManagement.vue'
-import SessionManagement from '@/views/admin/SessionManagement.vue'
-import AdminManagement from '@/views/admin/AdminManagement.vue'
-import AuditManagement from '@/views/admin/AuditManagement.vue'
-import SearchIndexManagement from '@/views/admin/SearchIndexManagement.vue'
+// 页面级组件统一按路由懒加载，避免普通用户首屏加载完整后台和大型业务页面。
+const layout = () => import('@/views/layout/index.vue')
+const explore = () => import('@/views/explore/index.vue')
+const publish = () => import('@/views/publish/index.vue')
+const notification = () => import('@/views/notification/index.vue')
+const user = () => import('@/views/user/index.vue')
+const userProfile = () => import('@/views/user/UserProfile.vue')
+const FollowList = () => import('@/views/user/FollowList.vue')
+const ChannelPage = () => import('@/views/explore/ChannelPage.vue')
+const PostDetail = () => import('@/views/PostDetail.vue')
+const SearchResult = () => import('@/views/search/SearchResult.vue')
+const PostManagementPage = () => import('@/views/post-management/index.vue')
+const DraftBoxPage = () => import('@/views/draft-box/index.vue')
+const TravelAiPage = () => import('@/views/travel-ai/index.vue')
+const NotFound = () => import('@/views/NotFound.vue')
+
+const AdminLogin = () => import('@/views/admin/AdminLogin.vue')
+const AdminLayout = () => import('@/views/admin/AdminLayout.vue')
+const ApiDocs = () => import('@/views/admin/ApiDocs.vue')
+const AdminMonitor = () => import('@/views/admin/AdminMonitor.vue')
+const UserManagement = () => import('@/views/admin/UserManagement.vue')
+const PostManagement = () => import('@/views/admin/PostManagement.vue')
+const CommentManagement = () => import('@/views/admin/CommentManagement.vue')
+const CategoryManagement = () => import('@/views/admin/CategoryManagement.vue')
+const TagManagement = () => import('@/views/admin/TagManagement.vue')
+const LikeManagement = () => import('@/views/admin/LikeManagement.vue')
+const CollectionManagement = () => import('@/views/admin/CollectionManagement.vue')
+const FollowManagement = () => import('@/views/admin/FollowManagement.vue')
+const NotificationManagement = () => import('@/views/admin/NotificationManagement.vue')
+const SessionManagement = () => import('@/views/admin/SessionManagement.vue')
+const AdminManagement = () => import('@/views/admin/AdminManagement.vue')
+const AuditManagement = () => import('@/views/admin/AuditManagement.vue')
+const SearchIndexManagement = () => import('@/views/admin/SearchIndexManagement.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -265,6 +266,19 @@ const router = createRouter({
       ]
     }
   ],
+})
+
+// 前端守卫只负责登录页体验，真实权限仍由后端 ROLE_ADMIN 强制执行。
+router.beforeEach((to) => {
+  if (to.path.startsWith('/admin')
+      && to.path !== '/admin/login'
+      && !localStorage.getItem('admin_token')) {
+    return {
+      name: 'admin_login',
+      query: { redirect: to.fullPath }
+    }
+  }
+  return true
 })
 
 export default router

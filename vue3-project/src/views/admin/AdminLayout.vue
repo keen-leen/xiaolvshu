@@ -138,6 +138,7 @@ import { useAdminStore } from '@/stores/admin'
 import { useThemeStore } from '@/stores/theme'
 import { useConfirm } from './composables/useConfirm'
 import { useScrollLock } from '@/composables/useScrollLock'
+import logoUrl from '@/assets/imgs/logo.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -145,8 +146,6 @@ const adminStore = useAdminStore()
 const themeStore = useThemeStore()
 const { confirmState, handleConfirm, handleCancel, confirmLogout } = useConfirm()
 const { lock, unlock } = useScrollLock()
-
-const logoUrl = new URL('@/assets/imgs/小石榴.png', import.meta.url).href
 
 const indicatorPosition = computed(() => {
   const index = themeStore.themeOptions.findIndex(option => option.value === themeStore.currentTheme)

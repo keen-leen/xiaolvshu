@@ -20,8 +20,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import com.xiaolvshu.entity.Post;
-
 import java.util.Arrays;
 
 /**
@@ -60,10 +58,21 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(errors -> errors
+                    .authenticationEntryPoint((request, response, exception) ->
+                            response.sendError(401, "Unauthorized"))
+                    .accessDeniedHandler((request, response, exception) ->
+                            response.sendError(403, "Forbidden")))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.POST, "/admin/search/sync", "/admin/rag/sync").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET,"/auth/**", "/health").permitAll()
-                .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
+                /*
+                 * 管理员登录是唯一允许匿名访问的管理端入口。必须把精确规则放在
+                 * /auth/admin/** 之前，禁止使用 /auth/** 这种宽泛白名单，否则创建管理员、
+                 * 管理员列表等接口也会被一并放行。
+                 */
+                .requestMatchers(HttpMethod.POST, "/auth/admin/login").permitAll()
+                .requestMatchers("/auth/admin/**", "/admin/**", "/v3/api-docs/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/auth/captcha", "/auth/check-user-id", "/auth/health", "/health").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login", "/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.POST, "/ai/travel/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/ai/travel/conversations/**").permitAll()
                 .requestMatchers(HttpMethod.DELETE, "/ai/travel/conversations/**").permitAll()
@@ -74,6 +83,8 @@ public class SecurityConfig {
                 // 帖子相关公开接口
                 .requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
                 // 用户相关公开接口
+                // 认证申请状态包含当前用户的私有审核记录，必须先于公开用户资料规则匹配。
+                .requestMatchers(HttpMethod.GET, "/users/verification/status").authenticated()
                 .requestMatchers(HttpMethod.GET, "/users", "/users/**").permitAll()
                 // 评论相关公开接口
                 .requestMatchers(HttpMethod.GET, "/comments/{commentId}/replies").permitAll()

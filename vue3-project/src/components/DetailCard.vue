@@ -472,6 +472,7 @@ import { useCommentLikeStore } from '@/stores/commentLike'
 import { commentApi, userApi, postApi, imageUploadApi } from '@/api/index.js'
 import { getPostDetail } from '@/api/posts.js'
 import { useScrollLock } from '@/composables/useScrollLock'
+import { useDetailVideo } from '@/composables/useDetailVideo'
 import { formatTime } from '@/utils/timeFormat'
 import { sanitizeContent } from '@/utils/contentSecurity'
 import defaultAvatar from '@/assets/imgs/avatar.png'
@@ -500,68 +501,6 @@ const props = defineProps({
     default: null
   }
 })
-
-
-
-// 处理视频加载
-const handleVideoLoad = (event) => {
-  const video = event.target
-  const aspectRatio = video.videoWidth / video.videoHeight
-
-  // 桌面端视频容器宽度计算
-  if (window.innerWidth > 768) {
-    const minWidth = 300
-    const maxWidth = props.pageMode ? 500 : 750
-    const containerHeight = Math.min(window.innerHeight * 0.9, 1020)
-    const idealWidth = containerHeight * aspectRatio
-
-    let optimalWidth = Math.max(minWidth, Math.min(maxWidth, idealWidth))
-
-    if (aspectRatio <= 0.6) {
-      optimalWidth = Math.min(optimalWidth, 500)
-    } else if (aspectRatio <= 0.8) {
-      optimalWidth = Math.min(optimalWidth, 600)
-    } else if (aspectRatio >= 2.0) {
-      optimalWidth = Math.max(optimalWidth, 600)
-    } else if (aspectRatio >= 1.5) {
-      optimalWidth = Math.max(optimalWidth, 550)
-    }
-
-    imageSectionWidth.value = optimalWidth
-  }
-
-  // 视频加载完成，隐藏封面并开始播放
-  isVideoLoaded.value = true
-  
-  // 延迟一点时间确保视频完全准备好
-  setTimeout(() => {
-    autoPlayVideo()
-  }, 100)
-}
-
-// 自动播放视频
-const autoPlayVideo = () => {
-  try {
-    // 检查是否为移动端
-    const isMobile = window.innerWidth <= 768
-    const currentVideoPlayer = isMobile ? mobileVideoPlayer.value : videoPlayer.value
-    
-    if (currentVideoPlayer) {
-      // 尝试自动播放
-      const playPromise = currentVideoPlayer.play()
-      
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          // 自动播放失败（通常是由于浏览器策略）
-          console.log('视频自动播放失败，需要用户交互:', error.message)
-        })
-      }
-    }
-  } catch (error) {
-    console.log('视频自动播放异常:', error.message)
-  }
-}
-
 const emit = defineEmits(['close', 'follow', 'unfollow', 'like', 'collect'])
 
 const themeStore = useThemeStore()
@@ -576,8 +515,6 @@ const authStore = useAuthStore()
 const { lock, unlock } = useScrollLock()
 
 const commentInput = ref('')
-const videoPlayer = ref(null)
-const mobileVideoPlayer = ref(null)
 const isLiked = computed(() => likeStore.getPostLikeState(props.item.id)?.liked || false)
 const likeCount = computed(() => likeStore.getPostLikeState(props.item.id)?.likeCount || props.item.likeCount || props.item.like_count || 0)
 const isCollected = computed(() => collectStore.getPostCollectState(props.item.id)?.collected || false)
@@ -585,6 +522,17 @@ const collectCount = computed(() => collectStore.getPostCollectState(props.item.
 
 const showTooltip = ref(false)
 const imageSectionWidth = ref(400)
+const {
+  autoPlayVideo,
+  handleVideoLoad,
+  isVideoLoaded,
+  mobileVideoPlayer,
+  videoPlayer
+} = useDetailVideo({
+  imageSectionWidth,
+  getVideoUrl: () => props.item?.video_url || '',
+  isPageMode: () => props.pageMode
+})
 const isInputFocused = ref(false)
 const scrollableContent = ref(null)
 let lastScrollTop = 0
@@ -606,88 +554,9 @@ const likeButtonRef = ref(null)
 const isAnimating = ref(true)
 const showContent = ref(false) // 新增：控制内容显示
 const isClosing = ref(false) // 新增：控制关闭动画状态
-const isVideoLoaded = ref(false) // 视频加载状态
 
 // 移动端检测
 const isMobile = computed(() => windowWidth.value <= 768)
-
-// 视频进度与音量记忆
-const getStorageKeys = (url) => {
-  const safeKey = url ? encodeURIComponent(url) : 'unknown'
-  return {
-    timeKey: `video_progress_${safeKey}`,
-    volumeKey: 'video_volume_global'
-  }
-}
-
-const restoreMediaStateFor = (el, url) => {
-  if (!el) return
-  const { timeKey, volumeKey } = getStorageKeys(url)
-  try {
-    // 恢复音量（默认 0.5）
-    const savedVolume = localStorage.getItem(volumeKey)
-    const volume = savedVolume !== null ? Number(savedVolume) : 0.5
-    el.volume = Math.max(0, Math.min(1, isNaN(volume) ? 0.5 : volume))
-
-    // 恢复进度
-    const savedTime = localStorage.getItem(timeKey)
-    if (savedTime !== null) {
-      const targetTime = Number(savedTime)
-      const seekOnMetadata = () => {
-        el.currentTime = isNaN(targetTime) ? 0 : targetTime
-        el.removeEventListener('loadedmetadata', seekOnMetadata)
-      }
-      if (el.readyState >= 1) {
-        el.currentTime = isNaN(targetTime) ? 0 : targetTime
-      } else {
-        el.addEventListener('loadedmetadata', seekOnMetadata)
-      }
-    }
-  } catch (_) {}
-}
-
-const mediaHandlersMap = new WeakMap()
-
-const bindMediaListenersFor = (el, url) => {
-  if (!el) return
-  const { timeKey, volumeKey } = getStorageKeys(url)
-  const handlers = {
-    timeupdate: () => {
-      try { localStorage.setItem(timeKey, String(el.currentTime || 0)) } catch (_) {}
-    },
-    volumechange: () => {
-      try { localStorage.setItem(volumeKey, String(el.volume)) } catch (_) {}
-    }
-  }
-  el.addEventListener('timeupdate', handlers.timeupdate)
-  el.addEventListener('volumechange', handlers.volumechange)
-  mediaHandlersMap.set(el, handlers)
-}
-
-const unbindMediaListenersFor = (el) => {
-  if (!el) return
-  const handlers = mediaHandlersMap.get(el)
-  if (handlers) {
-    el.removeEventListener('timeupdate', handlers.timeupdate)
-    el.removeEventListener('volumechange', handlers.volumechange)
-    mediaHandlersMap.delete(el)
-  }
-}
-
-const setupMediaPersistence = () => {
-  const url = props.item?.video_url || ''
-  // 恢复
-  restoreMediaStateFor(videoPlayer.value, url)
-  restoreMediaStateFor(mobileVideoPlayer.value, url)
-  // 绑定
-  bindMediaListenersFor(videoPlayer.value, url)
-  bindMediaListenersFor(mobileVideoPlayer.value, url)
-}
-
-const teardownMediaPersistence = () => {
-  unbindMediaListenersFor(videoPlayer.value)
-  unbindMediaListenersFor(mobileVideoPlayer.value)
-}
 
 // 动画完成后再显示复杂内容
 const handleAnimationEnd = (event) => {
@@ -713,36 +582,6 @@ onMounted(() => {
       showContent.value = true
     }
   }, 400) // 与动画时长一致
-})
-
-// 当视频加载完成或引用可用时，恢复与绑定；URL 变更时重置
-watch(() => isVideoLoaded.value, (loaded) => {
-  if (loaded) {
-    teardownMediaPersistence()
-    setupMediaPersistence()
-  }
-})
-
-watch(() => props.item?.video_url, () => {
-  teardownMediaPersistence()
-  nextTick(() => setupMediaPersistence())
-})
-
-// 首次默认音量 0.5（若未存过）
-onMounted(() => {
-  const url = props.item?.video_url || ''
-  try {
-    const { volumeKey } = getStorageKeys(url)
-    const savedVolume = localStorage.getItem(volumeKey)
-    if (savedVolume === null) {
-      if (videoPlayer.value) videoPlayer.value.volume = 0.5
-      if (mobileVideoPlayer.value) mobileVideoPlayer.value.volume = 0.5
-    }
-  } catch (_) {}
-})
-
-onUnmounted(() => {
-  teardownMediaPersistence()
 })
 
 const showToast = ref(false)

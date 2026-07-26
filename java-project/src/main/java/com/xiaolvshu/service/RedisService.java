@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.serializer.GenericToStringSerializer;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -129,12 +131,28 @@ public class RedisService {
      * @return 删除的数量
      */
     public long deleteByPrefix(String prefix) {
-        Set<String> keys = redisTemplate.keys(prefix + "*");
-        if (keys != null && !keys.isEmpty()) {
-            Long count = redisTemplate.delete(keys);
-            return count != null ? count : 0;
+        /*
+         * Redis KEYS 会在键空间较大时阻塞服务线程。SCAN 以游标分批遍历，
+         * 删除期间即使键集合发生变化也只影响本次缓存清理的最终数量，不影响业务事实数据。
+         */
+        List<String> batch = new ArrayList<>(500);
+        long deleted = 0;
+        try (Cursor<String> cursor = redisTemplate.scan(
+                ScanOptions.scanOptions().match(prefix + "*").count(500).build())) {
+            while (cursor.hasNext()) {
+                batch.add(cursor.next());
+                if (batch.size() == 500) {
+                    deleted += delete(batch);
+                    batch.clear();
+                }
+            }
+            if (!batch.isEmpty()) {
+                deleted += delete(batch);
+            }
+        } catch (Exception e) {
+            log.error("按前缀删除 Redis 缓存失败: prefix={}", prefix, e);
         }
-        return 0;
+        return deleted;
     }
 
     /**

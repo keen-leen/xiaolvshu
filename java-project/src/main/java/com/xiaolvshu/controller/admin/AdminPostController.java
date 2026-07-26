@@ -12,8 +12,12 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -113,9 +117,7 @@ public class AdminPostController {
         IPage<Post> postPage = postService.page(pageParam, wrapper);
         
         // 转换为DTO
-        List<AdminPostDTO> postDTOs = postPage.getRecords().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        List<AdminPostDTO> postDTOs = convertToDTOs(postPage.getRecords());
         
         return AdminResult.success(postDTOs, postPage.getTotal(), queryDTO.getPage(), queryDTO.getLimit());
     }
@@ -129,7 +131,7 @@ public class AdminPostController {
         if (post == null) {
             return AdminResult.notFound("笔记不存在");
         }
-        return AdminResult.success("操作成功", convertToDTO(post));
+        return AdminResult.success("操作成功", convertToDTOs(List.of(post)).getFirst());
     }
 
     /**
@@ -623,9 +625,86 @@ public class AdminPostController {
     }
 
     /**
-     * 转换为DTO
+     * 批量装配后台笔记 DTO。
+     *
+     * <p>列表页原先对每一条笔记分别查询作者、分类、图片、视频和标签，查询次数会随分页
+     * 记录数线性增长。这里先收集当前页外键，再对每类关联表各查询一次，最终按 postId
+     * 在内存中分组。这样查询次数稳定在常数级，同时详情接口也复用同一条装配路径。</p>
      */
-    private AdminPostDTO convertToDTO(Post post) {
+    List<AdminPostDTO> convertToDTOs(List<Post> posts) {
+        if (posts == null || posts.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> postIds = posts.stream().map(Post::getId).filter(Objects::nonNull).toList();
+        List<Long> userIds = posts.stream().map(Post::getUserId).filter(Objects::nonNull).distinct().toList();
+        List<Integer> categoryIds = posts.stream().map(Post::getCategoryId).filter(Objects::nonNull).distinct().toList();
+
+        Map<Long, User> usersById = userIds.isEmpty()
+                ? Collections.emptyMap()
+                : userService.listByIds(userIds).stream()
+                        .collect(Collectors.toMap(User::getId, Function.identity()));
+        Map<Integer, Category> categoriesById = categoryIds.isEmpty()
+                ? Collections.emptyMap()
+                : categoryService.listByIds(categoryIds).stream()
+                        .collect(Collectors.toMap(Category::getId, Function.identity()));
+
+        Map<Long, List<PostImage>> imagesByPostId = postImageService.list(
+                        new LambdaQueryWrapper<PostImage>()
+                                .in(PostImage::getPostId, postIds)
+                                .orderByAsc(PostImage::getId))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        PostImage::getPostId,
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+        Map<Long, PostVideo> videosByPostId = postVideoService.list(
+                        new LambdaQueryWrapper<PostVideo>().in(PostVideo::getPostId, postIds))
+                .stream()
+                .collect(Collectors.toMap(
+                        PostVideo::getPostId,
+                        Function.identity(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new));
+        Map<Long, List<PostTag>> postTagsByPostId = postTagService.list(
+                        new LambdaQueryWrapper<PostTag>().in(PostTag::getPostId, postIds))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        PostTag::getPostId,
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        List<Integer> tagIds = postTagsByPostId.values().stream()
+                .flatMap(List::stream)
+                .map(PostTag::getTagId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Integer, Tag> tagsById = tagIds.isEmpty()
+                ? Collections.emptyMap()
+                : tagService.listByIds(tagIds).stream()
+                        .collect(Collectors.toMap(Tag::getId, Function.identity()));
+
+        return posts.stream()
+                .map(post -> convertToDTO(
+                        post,
+                        usersById,
+                        categoriesById,
+                        imagesByPostId,
+                        videosByPostId,
+                        postTagsByPostId,
+                        tagsById))
+                .toList();
+    }
+
+    private AdminPostDTO convertToDTO(
+            Post post,
+            Map<Long, User> usersById,
+            Map<Integer, Category> categoriesById,
+            Map<Long, List<PostImage>> imagesByPostId,
+            Map<Long, PostVideo> videosByPostId,
+            Map<Long, List<PostTag>> postTagsByPostId,
+            Map<Integer, Tag> tagsById) {
         AdminPostDTO dto = new AdminPostDTO();
         dto.setId(post.getId());
         dto.setUserId(post.getUserId());
@@ -640,55 +719,40 @@ public class AdminPostController {
         dto.setIsDraft(post.getIsDraft());
         dto.setCreatedAt(post.getCreatedAt());
         
-        // 获取作者信息
-        if (post.getUserId() != null) {
-            User user = userService.getById(post.getUserId());
-            if (user != null) {
-                dto.setNickname(user.getNickname());
-                dto.setUserDisplayId(user.getUserId());
-            }
+        User user = usersById.get(post.getUserId());
+        if (user != null) {
+            dto.setNickname(user.getNickname());
+            dto.setUserDisplayId(user.getUserId());
         }
-        
-        // 获取分类信息
-        if (post.getCategoryId() != null) {
-            Category category = categoryService.getById(post.getCategoryId());
-            if (category != null) {
-                dto.setCategory(category.getName());
-            }
+
+        Category category = categoriesById.get(post.getCategoryId());
+        if (category != null) {
+            dto.setCategory(category.getName());
         }
-        
-        // 获取图片列表
-        LambdaQueryWrapper<PostImage> imageWrapper = new LambdaQueryWrapper<>();
-        imageWrapper.eq(PostImage::getPostId, post.getId());
-        List<PostImage> images = postImageService.list(imageWrapper);
+
+        List<PostImage> images = imagesByPostId.getOrDefault(post.getId(), Collections.emptyList());
         dto.setImages(images.stream().map(PostImage::getImageUrl).collect(Collectors.toList()));
-        
-        // 获取视频信息
-        LambdaQueryWrapper<PostVideo> videoWrapper = new LambdaQueryWrapper<>();
-        videoWrapper.eq(PostVideo::getPostId, post.getId());
-        PostVideo video = postVideoService.getOne(videoWrapper);
+
+        PostVideo video = videosByPostId.get(post.getId());
         if (video != null) {
             dto.setVideoUrl(video.getVideoUrl());
             dto.setCoverUrl(video.getCoverUrl());
         }
-        
-        // 获取标签列表
-        LambdaQueryWrapper<PostTag> tagWrapper = new LambdaQueryWrapper<>();
-        tagWrapper.eq(PostTag::getPostId, post.getId());
-        List<PostTag> postTags = postTagService.list(tagWrapper);
-        if (!postTags.isEmpty()) {
-            List<Integer> tagIds = postTags.stream().map(PostTag::getTagId).collect(Collectors.toList());
-            List<Tag> tags = tagService.listByIds(tagIds);
-            List<AdminPostDTO.AdminTagDTO> tagDTOs = tags.stream().map(tag -> {
+
+        List<AdminPostDTO.AdminTagDTO> tagDTOs = postTagsByPostId
+                .getOrDefault(post.getId(), Collections.emptyList())
+                .stream()
+                .map(PostTag::getTagId)
+                .map(tagsById::get)
+                .filter(Objects::nonNull)
+                .map(tag -> {
                 AdminPostDTO.AdminTagDTO tagDTO = new AdminPostDTO.AdminTagDTO();
                 tagDTO.setId(tag.getId());
                 tagDTO.setName(tag.getName());
                 return tagDTO;
-            }).collect(Collectors.toList());
-            dto.setTags(tagDTOs);
-        } else {
-            dto.setTags(new ArrayList<>());
-        }
+                })
+                .toList();
+        dto.setTags(tagDTOs);
         
         return dto;
     }

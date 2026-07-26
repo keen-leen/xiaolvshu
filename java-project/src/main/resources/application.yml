@@ -31,7 +31,10 @@ spring:
     virtual-host: ${RABBITMQ_VHOST:/}
     listener:
       simple:
-        acknowledge-mode: manual
+        # 由监听容器根据方法是否正常返回决定 ACK/NACK。监听方法抛出的异常会让数据库
+        # 事务回滚，并按队列的死信配置拒绝消息，避免业务代码在事务提交前提前 ACK。
+        acknowledge-mode: auto
+        default-requeue-rejected: false
 
   elasticsearch:
     uris: ${ELASTICSEARCH_URIS:http://localhost:19200}
@@ -145,15 +148,16 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-      logic-delete-field: isDeleted
-      logic-delete-value: 1
-      logic-not-delete-value: 0
   mapper-locations: classpath*:/mapper/**/*.xml
 
 logging:
   level:
     root: INFO
     com.xiaolvshu: ${APP_LOG_LEVEL:DEBUG}
+
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
 
 script:
   image-migration:

@@ -53,9 +53,8 @@ public class CollectionService extends ServiceImpl<CollectionMapper, Collection>
             // 已收藏，执行取消收藏
             this.removeById(existingCollection.getId());
             
-            // 更新笔记收藏数
-            post.setCollectCount(Math.max(0, post.getCollectCount() - 1));
-            postMapper.updateById(post);
+            // 单条 SQL 原子递减，避免并发收藏/取消时基于旧对象覆盖其他请求的结果。
+            postMapper.adjustCollectCount(postId, -1);
             
             return new CollectResponse(false);
         } else {
@@ -65,9 +64,8 @@ public class CollectionService extends ServiceImpl<CollectionMapper, Collection>
             collection.setPostId(postId);
             this.save(collection);
             
-            // 更新笔记收藏数
-            post.setCollectCount(post.getCollectCount() + 1);
-            postMapper.updateById(post);
+            // 单条 SQL 原子递增，收藏记录、计数和通知由当前事务共同提交或回滚。
+            postMapper.adjustCollectCount(postId, 1);
             
             // 创建收藏通知（不给自己发通知）
             if (!post.getUserId().equals(userId)) {
@@ -75,6 +73,8 @@ public class CollectionService extends ServiceImpl<CollectionMapper, Collection>
                 notification.setUserId(post.getUserId());
                 notification.setSenderId(userId);
                 notification.setType(Notification.TYPE_COLLECT_POST);
+                // notifications.title 为 NOT NULL；所有通知创建路径都必须显式提供展示标题。
+                notification.setTitle("收藏了你的笔记");
                 notification.setTargetId(postId);
                 notification.setIsRead(0);
                 notificationMapper.insert(notification);

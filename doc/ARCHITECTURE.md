@@ -62,8 +62,9 @@ MySQL 是用户、帖子、互动关系和同步状态的唯一事实来源。El
 
 旅行助手由 Spring AI 2.0 的 `ChatClient`、`MessageChatMemoryAdvisor` 和 `ToolCallingAdvisor`
 执行标准工具循环，应用只保留社区检索次数、引用编号、身份隔离和响应协议等业务边界。
-短期会话保存在 MySQL JDBC ChatMemory；当前只开放社区笔记检索，不提供实时天气、价格或票务工具。
-Controller 直接返回由 Spring MVC 托管的 SSE Flux，执行进度和最终回答使用 SSE v4，详见
+短期会话保存在 MySQL JDBC ChatMemory；天气工具通过 WeatherService 查询 Open-Meteo 当前天气和 7 日预报，
+价格和票务仍没有实时数据源。Controller 直接返回由 Spring MVC 托管的 SSE Flux，
+执行进度和最终回答使用 SSE v4，详见
 [TRAVEL_AGENT.md](TRAVEL_AGENT.md)。
 
 ## 配置原则

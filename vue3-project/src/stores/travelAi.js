@@ -29,7 +29,7 @@ export const useTravelAiStore = defineStore('travelAi', {
     conversationId: localStorage.getItem(CONVERSATION_STORAGE_KEY) || '',
     messages: initialMessages(),
     loading: false,
-    statusText: '',
+    statusSteps: [],
     hydrated: false
   }),
 
@@ -96,7 +96,7 @@ export const useTravelAiStore = defineStore('travelAi', {
       this.messages.push({ role: 'assistant', content: '', references: [] })
       activeAssistantIndex = this.messages.length - 1
       this.loading = true
-      this.statusText = ''
+      this.statusSteps = []
       controller = new AbortController()
 
       try {
@@ -114,7 +114,7 @@ export const useTravelAiStore = defineStore('travelAi', {
               }
             },
             onStatus: status => {
-              this.statusText = typeof status?.message === 'string' ? status.message.trim() : ''
+              this.appendStatus(status)
             },
             onChunk: chunk => this.appendChunk(chunk),
             onRefs: refs => {
@@ -154,11 +154,29 @@ export const useTravelAiStore = defineStore('travelAi', {
     },
 
     appendChunk(chunk) {
-      pendingText += typeof chunk === 'string' ? chunk : String(chunk || '')
+      const text = typeof chunk === 'string' ? chunk : String(chunk || '')
+      if (!text) {
+        return
+      }
+      pendingText += text
       if (!flushTimer) {
         // 40ms 合并窗口避免每个 token 都触发 Markdown 全量渲染。
         flushTimer = setTimeout(() => this.flushChunks(), 40)
       }
+    },
+
+    appendStatus(status) {
+      const message = typeof status?.message === 'string' ? status.message.trim() : ''
+      if (!message) {
+        return
+      }
+      const code = typeof status?.code === 'string' ? status.code : 'working'
+      const previous = this.statusSteps[this.statusSteps.length - 1]
+      // 同一状态可能被模型或工具重复发送，只保留相邻状态中的第一条。
+      if (previous?.code === code && previous?.message === message) {
+        return
+      }
+      this.statusSteps.push({ code, message })
     },
 
     flushChunks() {
@@ -179,7 +197,7 @@ export const useTravelAiStore = defineStore('travelAi', {
       controller = null
       this.flushChunks()
       this.loading = false
-      this.statusText = ''
+      this.statusSteps = []
     },
 
     finishStream() {
@@ -187,7 +205,7 @@ export const useTravelAiStore = defineStore('travelAi', {
       controller = null
       activeAssistantIndex = -1
       this.loading = false
-      this.statusText = ''
+      this.statusSteps = []
     },
 
     async clearConversation() {
@@ -200,7 +218,7 @@ export const useTravelAiStore = defineStore('travelAi', {
       this.conversationId = ''
       localStorage.removeItem(CONVERSATION_STORAGE_KEY)
       this.messages = initialMessages()
-      this.statusText = ''
+      this.statusSteps = []
       this.hydrated = true
     }
   }

@@ -62,6 +62,16 @@ final class TravelAgentRunContext {
     }
 
     /**
+     * 将工具执行进度发送到当前请求的 SSE 状态流。
+     *
+     * 工具只提供状态编码和面向用户的简短文案，不直接依赖 Controller 或 Reactor，
+     * 因此社区检索、天气查询以及后续工具都可以复用同一条状态通道。
+     */
+    void reportStatus(String code, String message) {
+        statusConsumer.accept(new AgentStatus(code, message));
+    }
+
+    /**
      * 把一次 RAG 调用内部的 S1、S2 编号转换为整次 Agent 运行共享的编号。
      *
      * <p>RAG 每次检索都会从 S1 开始。如果模型在一轮中进行了两次检索，直接拼接结果会让两个

@@ -15,7 +15,7 @@ const route = useRoute()
 const router = useRouter()
 const travelAiStore = useTravelAiStore()
 const userStore = useUserStore()
-const { messages, loading, statusText: currentStatusText } = storeToRefs(travelAiStore)
+const { messages, loading, statusSteps } = storeToRefs(travelAiStore)
 
 const userInput = ref('')
 const messageListRef = ref(null)
@@ -98,6 +98,8 @@ watch(open, (visible) => {
   }
 })
 
+watch([messages, statusSteps], () => nextTick(scrollToBottom), { deep: true })
+
 const sendMessage = async () => {
   if (!canSend.value) {
     return
@@ -166,18 +168,32 @@ const handleAvatarError = (event) => {
             <div class="message-content">
               <div
                 v-if="item.role === 'assistant' && idx === messages.length - 1 && loading"
-                :class="['stage-status', { waiting: !currentStatusText }]"
-                :aria-label="currentStatusText || '等待后端返回当前步骤'"
+                :class="['stage-status', { waiting: !statusSteps.length }]"
+                :aria-label="statusSteps.length ? statusSteps.map(step => step.message).join('；') : '等待后端返回当前步骤'"
                 aria-live="polite"
                 role="status"
               >
-                <span class="stage-compass" aria-hidden="true">
-                  <SvgIcon name="magic" width="13" height="13" color="currentColor" />
-                  <i></i>
-                </span>
-                <span v-if="currentStatusText" class="stage-copy">{{ currentStatusText }}</span>
-                <span v-else class="stage-placeholder" aria-hidden="true"><i></i></span>
-                <span class="stage-route" aria-hidden="true"><i></i><i></i><i></i></span>
+                <div v-if="statusSteps.length" class="stage-list">
+                  <div
+                    v-for="(step, stepIndex) in statusSteps"
+                    :key="`${step.code}-${stepIndex}`"
+                    :class="['stage-step', { completed: stepIndex < statusSteps.length - 1 }]"
+                  >
+                    <span class="stage-compass" aria-hidden="true">
+                      <SvgIcon name="magic" width="13" height="13" color="currentColor" />
+                      <i></i>
+                    </span>
+                    <span class="stage-copy">{{ step.message }}</span>
+                  </div>
+                </div>
+                <div v-else class="stage-step">
+                  <span class="stage-compass" aria-hidden="true">
+                    <SvgIcon name="magic" width="13" height="13" color="currentColor" />
+                    <i></i>
+                  </span>
+                  <span class="stage-placeholder" aria-hidden="true"><i></i></span>
+                  <span class="stage-route" aria-hidden="true"><i></i><i></i><i></i></span>
+                </div>
               </div>
               <div v-if="item.role === 'assistant' && item.content" class="message-bubble markdown-body" v-html="renderAssistantMarkdown(item.content)"></div>
               <div v-else-if="item.role === 'user'" class="message-bubble">{{ item.content }}</div>
@@ -216,7 +232,16 @@ const handleAvatarError = (event) => {
               <SvgIcon :name="loading ? 'close' : 'right'" width="18" height="18" color="white" />
             </button>
           </div>
-          <div class="input-meta"><span>Enter 发送</span><span>回复将参考社区笔记</span></div>
+          <div class="input-meta">
+            <span>Enter 发送</span>
+            <span class="weather-attribution">
+              天气数据：
+              <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open-Meteo</a>
+              · 地点数据：
+              <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer">GeoNames</a>
+            </span>
+            <span>回复将参考社区笔记</span>
+          </div>
         </footer>
       </div>
     </div>
@@ -552,9 +577,7 @@ const handleAvatarError = (event) => {
   position: relative;
   min-width: min(250px, 66vw);
   min-height: 38px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: block;
   margin-bottom: 7px;
   padding: 6px 9px;
   overflow: hidden;
@@ -562,6 +585,37 @@ const handleAvatarError = (event) => {
   border-radius: 12px;
   color: var(--text-color-secondary);
   background: color-mix(in srgb, var(--bg-color-primary) 86%, var(--travel-accent-soft));
+}
+
+.stage-list,
+.stage-step {
+  position: relative;
+  z-index: 1;
+}
+
+.stage-step {
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage-step + .stage-step {
+  margin-top: 6px;
+}
+
+.stage-step.completed .stage-compass > i {
+  border-style: solid;
+  opacity: 0.38;
+  animation: none;
+}
+
+.stage-step.completed .stage-copy {
+  color: var(--text-color-tertiary);
+  font-weight: 500;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  animation: none;
 }
 
 .stage-status::after {
@@ -683,6 +737,16 @@ const handleAvatarError = (event) => {
 
 .source-list {
   margin-top: 9px;
+}
+
+.input-meta a {
+  color: var(--text-color-tertiary);
+  font-size: 9px;
+  text-decoration: none;
+}
+
+.input-meta a:hover {
+  color: var(--primary-color);
 }
 
 .source-list > p {

@@ -14,4 +14,10 @@ class TravelAgentConfigurationTest {
         assertFalse(TravelAgentConfiguration.SYSTEM_PROMPT
                 .contains("必须保留工具结果中的 [S1]、[S2] 来源编号"));
     }
+
+    @Test
+    void shouldRequireWeatherToolForRealtimeWeather() {
+        assertTrue(TravelAgentConfiguration.SYSTEM_PROMPT
+                .contains("查询实时天气或未来7日天气时必须调用 get_weather"));
+    }
 }

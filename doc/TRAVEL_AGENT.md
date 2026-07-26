@@ -7,8 +7,8 @@ POST /ai/travel/chat
   -> ChatClient
   -> MessageChatMemoryAdvisor（加载最近对话）
   -> ToolCallingAdvisor（自动完成模型 -> 工具 -> 模型循环）
-  -> @Tool search_community_notes
-  -> 流式答案与引用
+  -> @Tool search_community_notes / get_weather
+  -> 流式答案与社区引用
 ```
 
 业务代码不再手工解析 `tool_calls`、拼接工具响应或维护递归步骤。Spring AI Advisor 负责协议循环，
@@ -20,13 +20,23 @@ POST /ai/travel/chat
 | --- | --- |
 | `TravelAgentConfiguration` | 创建 `ChatClient`、`MessageChatMemoryAdvisor`、`ToolCallingAdvisor` 和消息窗口 |
 | `TravelAgentService` | 返回 SSE Flux、设置请求级 ToolContext、合并模型/工具/心跳事件、处理总超时与终态 |
-| `TravelAgentTools` | 用 `@Tool` 暴露唯一的社区笔记检索能力 |
-| `TravelAgentRunContext` | 限制单次检索次数、统一多次检索的 `[S1]` 编号、按需生成引用规则并收集最终引用 |
+| `TravelAgentTools` | 统一声明社区检索和天气 `@Tool`，只处理工具参数与服务转发 |
+| `WeatherService` | 调用 Open-Meteo，并完成地点查询、当前天气和 7 日预报 |
+| `TravelAgentRunContext` | 限制单次社区检索次数、统一多次检索的 `[S1]` 编号、按需生成引用规则并收集最终引用 |
 | `TravelAgentConversationService` | 签发会话 ID、隔离用户、恢复/清空 JDBC ChatMemory、清理过期会话 |
 | `AgentAccessGuard` | 访问者限流和实例级在途请求保护 |
 
-当前仅开放 `search_community_notes`。天气、票务、价格没有真实 Provider，系统提示会要求模型明确
-说明没有实时数据，禁止伪造“已查询”的结果。
+当前开放 `search_community_notes` 和 `get_weather`。两个工具统一声明在 `TravelAgentTools`；
+RAG 查询由 `RagService` 实现，天气查询由 `WeatherService` 调用 Open-Meteo Geocoding API 和
+Forecast API。地点无结果或请求失败时返回简短失败信息，模型不得猜测。
+票务、价格和营业状态没有真实数据源，不能声称已经查询。
+
+## 天气工具
+
+`get_weather` 只接收一个地点参数。`TravelAgentTools` 将参数转给 `WeatherService`，后者先通过
+Open-Meteo Geocoding API 获取经纬度和时区，再通过一次 Forecast API 请求取得当前天气和未来
+7 日预报，并将 WMO 天气代码整理为中文文本。当前使用无需密钥的非商业开放接口，实现只保留
+3 秒连接/读取超时，不加入缓存、重试、地点消歧或 Provider 框架。
 
 ## 亮点：RAG 成功后按需加载引用规则
 
@@ -127,7 +137,7 @@ meta -> status* -> chunk* -> refs -> done
 | 事件 | 内容 |
 | --- | --- |
 | `meta` | `run_id`、`protocol_version: 4`、后端签发的 `conversation_id` |
-| `status` | `thinking`、`searching`、`writing` 等简短进度；不是模型思维过程 |
+| `status` | `thinking`、`searching`、`weather_searching`、`writing` 等简短进度；不是模型思维过程 |
 | `chunk` | 最终回答的增量文本 |
 | `refs` | 去重后的社区笔记引用，`source_id` 与正文 `[S1]` 一一对应 |
 | `done` | `finish_reason`、`elapsed_ms` 等成功终态 |
@@ -136,8 +146,9 @@ meta -> status* -> chunk* -> refs -> done
 v4 不再发送无消费方、也无法支持 POST 自动重连的 SSE `id`。心跳使用 SSE 注释，不会进入正文。
 Controller 直接返回 `Flux<ServerSentEvent<?>>`，Spring MVC 负责订阅、SSE 编码和断连取消；应用不再
 创建 `SseEmitter`、手工 `subscribe` 或保存 `Disposable`。前端使用 `fetch + AbortController`
-解析 POST SSE，并以约 40ms 批量写入 token。弹窗与完整页面共用一个 Pinia store，所以切换入口
-不会维护两份历史或协议代码。
+解析 POST SSE，并以约 40ms 批量写入 token。最终回答开始输出前，前端会按接收顺序展开显示
+`status` 过程；收到第一个正文 `chunk` 后收起状态区。弹窗与完整页面共用一个 Pinia store，
+所以切换入口不会维护两份历史、状态过程或协议代码。
 
 ## 边界与配置
 

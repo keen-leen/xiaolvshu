@@ -3,7 +3,6 @@ package com.xiaolvshu.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.xiaolvshu.dto.CommunitySearchResult;
-import com.xiaolvshu.dto.TravelChatRequest;
 import com.xiaolvshu.dto.TravelNoteReference;
 import com.xiaolvshu.entity.Post;
 import com.xiaolvshu.entity.PostTag;
@@ -61,7 +60,7 @@ public class RagService {
     /**
      * 检索社区笔记并转换为 Agent 工具结果。
      *
-     * @param query       用户原始问题
+     * @param query       模型结合当前问题和会话上下文生成的检索词
      * @param destination 可选目的地，用于增强检索 query
      * @param interests   可选兴趣标签，用于增强检索 query
      * @param topK        召回数量，限制在 1 到 10
@@ -77,14 +76,6 @@ public class RagService {
         result.setReferences(mapReferences(docs));
         result.setContextText(renderContextText(docs));
         return result;
-    }
-
-    /**
-     * 兼容旧代码的 RAG 上下文构建入口。
-     */
-    public CommunitySearchResult buildRagContext(TravelChatRequest request) {
-        String userPrompt = request.getMessage() == null ? "" : request.getMessage().trim();
-        return searchCommunityNotes(userPrompt, null, Collections.emptyList(), request.getTopK());
     }
 
     /**

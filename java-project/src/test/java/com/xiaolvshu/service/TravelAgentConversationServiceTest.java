@@ -46,6 +46,15 @@ class TravelAgentConversationServiceTest {
     }
 
     @Test
+    void shouldReuseGeneratedPublicIdInFollowingRequest() {
+        TravelAgentConversationService.Conversation first = service.resolve(null);
+        TravelAgentConversationService.Conversation second = service.resolve(first.publicId());
+
+        assertEquals(first.publicId(), second.publicId());
+        assertEquals(first.storageKey(), second.storageKey());
+    }
+
+    @Test
     void shouldRestoreOnlyDisplayableMessages() {
         String publicId = "20b1c884-8e44-4fe9-b7bf-e2b29b1598da";
         String storageKey = "travel-agent:anonymous:" + publicId;

@@ -53,7 +53,7 @@ class TravelAgentToolsTest {
                 new ToolContext(Map.of(TravelAgentRunContext.TOOL_CONTEXT_KEY, runContext)));
 
         assertTrue(result.contains("杭州今天晴"));
-        assertTrue(statuses.contains("weather_searching:正在查询地点“杭州”的当前及未来7日天气"));
+        assertTrue(statuses.contains("weather_searching:正在查询杭州的当前及未来7日天气"));
         assertTrue(statuses.contains("writing:正在结合天气信息整理回答"));
         verify(weatherService).getWeather("杭州");
     }

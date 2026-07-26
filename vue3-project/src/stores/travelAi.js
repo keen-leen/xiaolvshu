@@ -103,8 +103,8 @@ export const useTravelAiStore = defineStore('travelAi', {
         await travelAiApi.chat(
           {
             message: text,
-            topK: 5,
-            conversationId: this.conversationId || null
+            top_k: 5,
+            conversation_id: this.conversationId || null
           },
           {
             onMeta: meta => {

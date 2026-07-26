@@ -74,7 +74,7 @@ Open-Meteo Geocoding API 获取经纬度和时区，再通过一次 Forecast API
 
 ## 会话记忆
 
-首次请求可以不传 `conversationId`，后端会生成随机 UUID，并在 `meta.conversation_id` 返回。
+首次请求可以不传 `conversation_id`，后端会生成随机 UUID，并在 `meta.conversation_id` 返回。
 后续请求只上传当前问题和该 ID，不再由浏览器上传可篡改、重复且不断膨胀的 `history`。
 
 真正写入 MySQL 的 key 会附加身份命名空间：
@@ -106,8 +106,8 @@ Accept: text/event-stream
 
 {
   "message": "帮我安排杭州三日亲子游",
-  "topK": 5,
-  "conversationId": "可选，由上一次 meta 返回"
+  "top_k": 5,
+  "conversation_id": "可选，由上一次 meta 返回"
 }
 ```
 

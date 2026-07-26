@@ -1,6 +1,7 @@
 package com.xiaolvshu.controller;
 
 import com.xiaolvshu.dto.TravelAgentSsePayload;
+import com.xiaolvshu.dto.TravelChatRequest;
 import com.xiaolvshu.exception.AgentAccessException;
 import com.xiaolvshu.exception.TravelAgentExceptionHandler;
 import com.xiaolvshu.service.AgentAccessGuard;
@@ -9,6 +10,7 @@ import com.xiaolvshu.service.TravelAgentConversationService;
 import com.xiaolvshu.service.TravelAgentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -19,9 +21,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import reactor.core.publisher.Flux;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -70,12 +74,25 @@ class TravelAgentControllerTest {
                                 "run-1", "conversation-1", "completed", 12))
                         .build()));
 
+        String conversationId = "20b1c884-8e44-4fe9-b7bf-e2b29b1598da";
         MvcResult mvcResult = mockMvc.perform(post("/ai/travel/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.TEXT_EVENT_STREAM)
-                        .content("{\"message\":\"成都三日游\",\"topK\":5}"))
+                        .content("""
+                                {
+                                  "message":"成都三日游",
+                                  "top_k":3,
+                                  "conversation_id":"%s"
+                                }
+                                """.formatted(conversationId)))
                 .andExpect(request().asyncStarted())
                 .andReturn();
+
+        // 请求 DTO 显式使用 snake_case，确保后续轮次传入的会话 ID 不会被 Jackson 当作未知字段忽略。
+        ArgumentCaptor<TravelChatRequest> requestCaptor = ArgumentCaptor.forClass(TravelChatRequest.class);
+        verify(travelAgentService).chat(requestCaptor.capture(), any());
+        assertEquals(conversationId, requestCaptor.getValue().getConversationId());
+        assertEquals(3, requestCaptor.getValue().getTopK());
 
         /*
          * Flux 是 Spring MVC 的异步返回值：第一次 dispatch 建立订阅，asyncDispatch 后

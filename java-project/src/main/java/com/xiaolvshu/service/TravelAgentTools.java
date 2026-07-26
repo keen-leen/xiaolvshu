@@ -64,7 +64,7 @@ public class TravelAgentTools {
         // 与社区检索共用 status 事件，前端无需增加天气专用协议或解析逻辑。
         runContext.reportStatus(
                 "weather_searching",
-                "正在查询地点" + safeLocation + "的当前及未来7日天气");
+                "正在查询" + safeLocation + "的当前及未来7日天气");
         try {
             return weatherService.getWeather(safeLocation);
         } finally {

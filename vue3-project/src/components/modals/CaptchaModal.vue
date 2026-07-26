@@ -14,7 +14,8 @@
             <div class="loading-spinner"></div>
             <span>加载中...</span>
           </div>
-          <div v-else-if="captchaSvg" class="captcha-image" v-html="captchaSvg"></div>
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div v-else-if="safeCaptchaSvg" class="captcha-image" v-html="safeCaptchaSvg"></div>
           <div v-else class="captcha-error">验证码加载失败，点击重试</div>
         </div>
 
@@ -36,10 +37,9 @@
 </template>
 
 <script setup>
-import { ref, toRefs, watch, nextTick } from 'vue'
+import { computed, ref, toRefs, watch, nextTick } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
-
-
+import { sanitizeSvg } from '@/utils/contentSecurity'
 
 const props = defineProps({
   show: {
@@ -63,6 +63,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'refresh', 'confirm', 'update:captchaText'])
 
 const { captchaText } = toRefs(props)
+const safeCaptchaSvg = computed(() => sanitizeSvg(props.captchaSvg))
 const inputRefs = ref([])
 const captchaInputs = ref(['', '', '', ''])
 

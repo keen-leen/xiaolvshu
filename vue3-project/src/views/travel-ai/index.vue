@@ -180,11 +180,14 @@ const handleAvatarError = event => {
                   <span class="stage-route" aria-hidden="true"><i></i><i></i><i></i></span>
                 </div>
               </div>
+              <!-- 旅行助手 Markdown 已在共享工具中经过 DOMPurify。 -->
+              <!-- eslint-disable vue/no-v-html -->
               <div
                 v-if="message.role === 'assistant' && message.content"
                 class="message-bubble markdown-body"
                 v-html="renderMarkdown(message.content)"
               ></div>
+              <!-- eslint-enable vue/no-v-html -->
               <div v-else-if="message.role === 'user'" class="message-bubble">{{ message.content }}</div>
 
               <div v-if="message.role === 'assistant' && message.references?.length" class="reference-list">

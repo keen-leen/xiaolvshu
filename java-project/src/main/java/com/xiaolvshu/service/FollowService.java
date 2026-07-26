@@ -19,6 +19,7 @@ import com.xiaolvshu.mapper.NotificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -69,16 +70,19 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
         Follow follow = new Follow();
         follow.setFollowerId(followerId);
         follow.setFollowingId(followingId);
-        followMapper.insert(follow);
+        try {
+            followMapper.insert(follow);
+        } catch (DuplicateKeyException exception) {
+            /*
+             * 前置查询用于快速返回友好提示，但两个并发请求仍可能同时通过查询。
+             * 数据库唯一索引是最终防线，这里把索引冲突还原为稳定的业务语义。
+             */
+            throw new BusinessException("已关注该用户");
+        }
         
-        // 更新关注者的关注数
-        User follower = userMapper.selectById(followerId);
-        follower.setFollowCount(follower.getFollowCount() + 1);
-        userMapper.updateById(follower);
-        
-        // 更新被关注者的粉丝数
-        targetUser.setFansCount(targetUser.getFansCount() + 1);
-        userMapper.updateById(targetUser);
+        // 计数使用原子 SQL 更新，避免并发关注基于旧 User 快照互相覆盖。
+        userMapper.adjustFollowCount(followerId, 1);
+        userMapper.adjustFansCount(followingId, 1);
 
         // 发送关注通知
         Notification notification = new Notification();
@@ -115,14 +119,8 @@ public class FollowService extends ServiceImpl<FollowMapper, Follow> {
         // 删除关注记录
         followMapper.deleteById(follow.getId());
         
-        // 更新关注者的关注数
-        User follower = userMapper.selectById(followerId);
-        follower.setFollowCount(Math.max(0, follower.getFollowCount() - 1));
-        userMapper.updateById(follower);
-        
-        // 更新被关注者的粉丝数
-        targetUser.setFansCount(Math.max(0, targetUser.getFansCount() - 1));
-        userMapper.updateById(targetUser);
+        userMapper.adjustFollowCount(followerId, -1);
+        userMapper.adjustFansCount(followingId, -1);
 
         // 删除未读的关注通知
         notificationMapper.delete(new LambdaQueryWrapper<Notification>()

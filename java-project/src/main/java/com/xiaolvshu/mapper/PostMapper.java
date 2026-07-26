@@ -71,4 +71,10 @@ public interface PostMapper extends BaseMapper<Post> {
      */
     @Update("UPDATE posts SET collect_count = GREATEST(0, collect_count + #{delta}) WHERE id = #{id}")
     int adjustCollectCount(@Param("id") Long id, @Param("delta") int delta);
+
+    /**
+     * 原子调整评论数，避免多个评论创建或删除事务基于同一个旧值互相覆盖。
+     */
+    @Update("UPDATE posts SET comment_count = GREATEST(0, comment_count + #{delta}) WHERE id = #{id}")
+    int adjustCommentCount(@Param("id") Long id, @Param("delta") int delta);
 }

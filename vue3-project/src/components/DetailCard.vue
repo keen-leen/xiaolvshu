@@ -3,12 +3,12 @@
     v-click-outside.mousedown="!pageMode ? closeModal : undefined" v-escape-key="!pageMode ? closeModal : undefined">
     <div class="detail-card" @click="handleDetailCardClick"
         :style="pageMode ? {} : { width: cardWidth + 'px', ...(isClosing ? {} : animationStyle) }"
-        :class="{ 
-          'scale-in': isAnimating && !pageMode && !isMobile, 
+        :class="{
+          'scale-in': isAnimating && !pageMode && !isMobile,
           'scale-out': isClosing && !pageMode && !isMobile,
           'slide-in': isAnimating && !pageMode && isMobile,
           'slide-out': isClosing && !pageMode && isMobile,
-          'page-mode': pageMode 
+          'page-mode': pageMode
         }"
         @animationend="handleAnimationEnd">
       <button v-if="!pageMode" class="close-btn" @click="closeModal" @mouseenter="showTooltip = true"
@@ -23,21 +23,21 @@
         <div class="image-section" :style="{ width: imageSectionWidth + 'px' }" @mouseenter="showImageControls = true"
           @mouseleave="showImageControls = false">
           <!-- 视频播放器（桌面端） -->
-          <div v-if="props.item.type === 2" class="video-container">
+          <div v-if="detailItem.type === 2" class="video-container">
             <div v-if="!isVideoLoaded" class="video-placeholder">
-              <img 
-                v-if="props.item.cover_url || (props.item.images && props.item.images[0])" 
-                :src="props.item.cover_url || props.item.images[0]" 
-                :alt="props.item.title || '视频封面'"
+              <img
+                v-if="detailItem.cover_url || (detailItem.images && detailItem.images[0])"
+                :src="detailItem.cover_url || detailItem.images[0]"
+                :alt="detailItem.title || '视频封面'"
                 class="video-cover-placeholder"
               />
             </div>
-            <video 
+            <video
               v-show="isVideoLoaded"
               ref="videoPlayer"
-              :src="props.item.video_url" 
-              :poster="props.item.cover_url || (props.item.images && props.item.images[0])"
-              controls 
+              :src="detailItem.video_url"
+              :poster="detailItem.cover_url || (detailItem.images && detailItem.images[0])"
+              controls
               preload="metadata"
               webkit-playsinline="true"
               playsinline="true"
@@ -51,9 +51,9 @@
           <!-- 图片轮播（图文笔记） -->
           <div v-else class="image-container" @wheel="handleImageWheel">
             <div class="image-slider" :style="{ transform: `translateX(-${currentImageIndex * 100}%)` }">
-              <img v-for="(image, index) in imageList" :key="index" 
-                :src="showContent ? image : (index === 0 ? props.item.image : '')" 
-                :alt="props.item.title || '图片'"
+              <img v-for="(image, index) in imageList" :key="index"
+                :src="showContent ? image : (index === 0 ? detailItem.image : '')"
+                :alt="detailItem.title || '图片'"
                 @load="handleImageLoad($event, index)" :style="{ objectFit: 'contain' }"
                 class="slider-image image-zoomable" @click="openImageViewer" />
             </div>
@@ -100,12 +100,12 @@
 
           <div class="scrollable-content" ref="scrollableContent">
             <!-- 视频播放器（移动端） -->
-            <div v-if="props.item.type === 2" class="mobile-video-container">
+            <div v-if="detailItem.type === 2" class="mobile-video-container">
               <div v-if="!isVideoLoaded" class="video-placeholder">
-                <img 
-                  v-if="props.item.cover_url || (props.item.images && props.item.images[0])" 
-                  :src="props.item.cover_url || props.item.images[0]" 
-                  :alt="props.item.title || '视频封面'"
+                <img
+                  v-if="detailItem.cover_url || (detailItem.images && detailItem.images[0])"
+                  :src="detailItem.cover_url || detailItem.images[0]"
+                  :alt="detailItem.title || '视频封面'"
                   class="video-cover-placeholder"
                 />
                 <div v-else class="placeholder-content">
@@ -113,12 +113,12 @@
                   <p>视频加载中...</p>
                 </div>
               </div>
-              <video 
+              <video
                 v-show="isVideoLoaded"
                 ref="mobileVideoPlayer"
-                :src="props.item.video_url" 
-                :poster="props.item.cover_url || (props.item.images && props.item.images[0])"
-                controls 
+                :src="detailItem.video_url"
+                :poster="detailItem.cover_url || (detailItem.images && detailItem.images[0])"
+                controls
                 preload="metadata"
                 webkit-playsinline="true"
                 playsinline="true"
@@ -132,8 +132,8 @@
             <div v-else-if="imageList && imageList.length > 0" class="mobile-image-container">
               <div class="mobile-image-slider" :style="{ transform: `translateX(-${currentImageIndex * 100}%)` }"
                 @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
-                <img v-for="(image, index) in imageList" :key="index" 
-                  :src="showContent ? image : (index === 0 ? props.item.image : '')" 
+                <img v-for="(image, index) in imageList" :key="index"
+                  :src="showContent ? image : (index === 0 ? detailItem.image : '')"
                   :alt="`图片 ${index + 1}`"
                   class="mobile-slider-image" @click="openImageViewer" @load="handleImageLoad($event, index)" />
               </div>
@@ -448,8 +448,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import SvgIcon from './SvgIcon.vue'
 import FollowButton from './FollowButton.vue'
 import LikeButton from './LikeButton.vue'
@@ -461,7 +460,6 @@ import ContentEditableInput from './ContentEditableInput.vue'
 import ImageUploadModal from './modals/ImageUploadModal.vue'
 import ImageViewer from './ImageViewer.vue'
 import VerifiedBadge from './VerifiedBadge.vue'
-import { useThemeStore } from '@/stores/theme'
 import { useUserStore } from '@/stores/user'
 import { useLikeStore } from '@/stores/like.js'
 import { useCollectStore } from '@/stores/collect.js'
@@ -476,8 +474,6 @@ import { useDetailVideo } from '@/composables/useDetailVideo'
 import { formatTime } from '@/utils/timeFormat'
 import { sanitizeContent } from '@/utils/contentSecurity'
 import defaultAvatar from '@/assets/imgs/avatar.png'
-
-const router = useRouter()
 
 const props = defineProps({
   disableAutoFetch: {
@@ -503,7 +499,16 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'follow', 'unfollow', 'like', 'collect'])
 
-const themeStore = useThemeStore()
+/*
+ * 详情接口会补充瀑布流卡片中没有的字段，因此组件需要一份可写的内部快照。
+ * 直接合并到 props 会破坏 Vue 的单向数据流，也可能意外修改父列表缓存。
+ */
+const detailItem = reactive({ ...props.item })
+watch(() => props.item, item => {
+  Object.keys(detailItem).forEach(key => delete detailItem[key])
+  Object.assign(detailItem, item)
+})
+
 const userStore = useUserStore()
 const likeStore = useLikeStore()
 const collectStore = useCollectStore()
@@ -515,10 +520,10 @@ const authStore = useAuthStore()
 const { lock, unlock } = useScrollLock()
 
 const commentInput = ref('')
-const isLiked = computed(() => likeStore.getPostLikeState(props.item.id)?.liked || false)
-const likeCount = computed(() => likeStore.getPostLikeState(props.item.id)?.likeCount || props.item.likeCount || props.item.like_count || 0)
-const isCollected = computed(() => collectStore.getPostCollectState(props.item.id)?.collected || false)
-const collectCount = computed(() => collectStore.getPostCollectState(props.item.id)?.collectCount || props.item.collectCount || props.item.collect_count || 0)
+const isLiked = computed(() => likeStore.getPostLikeState(detailItem.id)?.liked || false)
+const likeCount = computed(() => likeStore.getPostLikeState(detailItem.id)?.likeCount || detailItem.likeCount || detailItem.like_count || 0)
+const isCollected = computed(() => collectStore.getPostCollectState(detailItem.id)?.collected || false)
+const collectCount = computed(() => collectStore.getPostCollectState(detailItem.id)?.collectCount || detailItem.collectCount || detailItem.collect_count || 0)
 
 const showTooltip = ref(false)
 const imageSectionWidth = ref(400)
@@ -530,7 +535,7 @@ const {
   videoPlayer
 } = useDetailVideo({
   imageSectionWidth,
-  getVideoUrl: () => props.item?.video_url || '',
+  getVideoUrl: () => detailItem?.video_url || '',
   isPageMode: () => props.pageMode
 })
 const isInputFocused = ref(false)
@@ -638,13 +643,13 @@ const animationStyle = computed(() => {
 
 const authorData = computed(() => {
   // 使用小旅书号进行用户跳转
-  const userId = props.item.author_account || props.item.user_id || props.item.originalData?.userId
+  const userId = detailItem.author_account || detailItem.user_id || detailItem.originalData?.userId
   const followState = followStore.getUserFollowState(userId)
   return {
     id: userId,
-    name: props.item.nickname || props.item.author || '匿名用户',
-    avatar: props.item.user_avatar || props.item.avatar || defaultAvatar,
-    verified: props.item.verified || props.item.author_verified || 0,
+    name: detailItem.nickname || detailItem.author || '匿名用户',
+    avatar: detailItem.user_avatar || detailItem.avatar || defaultAvatar,
+    verified: detailItem.verified || detailItem.author_verified || 0,
     isFollowing: followState.followed,
     buttonType: followState.buttonType
   }
@@ -657,39 +662,39 @@ const isCurrentUserPost = computed(() => {
   }
 
   const currentUserId = userStore.userInfo.id // 当前用户的自增ID
-  const authorId = props.item.author_auto_id // 笔记作者的自增ID
+  const authorId = detailItem.author_auto_id // 笔记作者的自增ID
 
   return currentUserId === authorId
 })
 
 const postData = computed(() => {
   const data = {
-    title: props.item.title || '无标题',
-    content: props.item.originalData?.content || props.item.content || '暂无内容',
-    tags: props.item.originalData?.tags ?
-      (Array.isArray(props.item.originalData.tags) ?
-        props.item.originalData.tags.map(tag => typeof tag === 'object' ? tag.name : tag) :
+    title: detailItem.title || '无标题',
+    content: detailItem.originalData?.content || detailItem.content || '暂无内容',
+    tags: detailItem.originalData?.tags ?
+      (Array.isArray(detailItem.originalData.tags) ?
+        detailItem.originalData.tags.map(tag => typeof tag === 'object' ? tag.name : tag) :
         []) :
-      (props.item.tags ?
-        (Array.isArray(props.item.tags) ?
-          props.item.tags.map(tag => typeof tag === 'object' ? tag.name : tag) :
+      (detailItem.tags ?
+        (Array.isArray(detailItem.tags) ?
+          detailItem.tags.map(tag => typeof tag === 'object' ? tag.name : tag) :
           []) :
         []),
-    time: formatTime(props.item.originalData?.createdAt || props.item.created_at || props.item.time),
-    location: props.item.location || ''
+    time: formatTime(detailItem.originalData?.createdAt || detailItem.created_at || detailItem.time),
+    location: detailItem.location || ''
   }
   return data
 })
 
 const imageList = computed(() => {
-  if (props.item.originalData?.images && Array.isArray(props.item.originalData.images) && props.item.originalData.images.length > 0) {
-    return props.item.originalData.images
+  if (detailItem.originalData?.images && Array.isArray(detailItem.originalData.images) && detailItem.originalData.images.length > 0) {
+    return detailItem.originalData.images
   }
-  if (props.item.images && Array.isArray(props.item.images) && props.item.images.length > 0) {
-    return props.item.images
+  if (detailItem.images && Array.isArray(detailItem.images) && detailItem.images.length > 0) {
+    return detailItem.images
   }
-  if (props.item.image) {
-    return [props.item.image]
+  if (detailItem.image) {
+    return [detailItem.image]
   }
   return [new URL('@/assets/imgs/未加载.png', import.meta.url).href]
 })
@@ -697,31 +702,24 @@ const imageList = computed(() => {
 // 详情接口保留旧 images 字符串数组，同时额外返回同顺序的来源对象。
 // 使用当前轮播下标选择署名，避免把 A 图摄影师错误显示到 B 图下面。
 const currentImageAttribution = computed(() => {
-  const attributions = props.item.originalData?.imageAttributions
-    || props.item.imageAttributions
-    || props.item.image_attributions
+  const attributions = detailItem.originalData?.imageAttributions
+    || detailItem.imageAttributions
+    || detailItem.image_attributions
     || []
   return Array.isArray(attributions) ? attributions[currentImageIndex.value] : null
 })
 
 const hasMultipleImages = computed(() => imageList.value.length > 1)
 
-// 评论图片查看器是否有多张图片
-const commentHasMultipleImages = computed(() => {
-  return commentImages.value.length > 1
-})
-
-
-
-const comments = computed(() => commentStore.getComments(props.item.id).comments || [])
-const loadingComments = computed(() => commentStore.getComments(props.item.id).loading || false)
-const commentCount = computed(() => commentStore.getComments(props.item.id).total || 0)
+const comments = computed(() => commentStore.getComments(detailItem.id).comments || [])
+const loadingComments = computed(() => commentStore.getComments(detailItem.id).loading || false)
+const commentCount = computed(() => commentStore.getComments(detailItem.id).total || 0)
 
 // 评论分页加载（不再需要displayedCommentsCount，直接显示所有已获取的评论）
 
 // 判断是否还有更多评论可以显示
 const hasMoreCommentsToShow = computed(() => {
-  const commentData = commentStore.getComments(props.item.id)
+  const commentData = commentStore.getComments(detailItem.id)
   return commentData.hasMore || false
 })
 
@@ -747,18 +745,18 @@ const enhancedComments = computed(() => {
 })
 
 watch(commentCount, (newTotal) => {
-  if (props.item.commentCount !== newTotal) {
-    props.item.commentCount = newTotal
+  if (detailItem.commentCount !== newTotal) {
+    detailItem.commentCount = newTotal
   }
 })
 
-watch(() => props.item.id, () => {
+watch(() => detailItem.id, () => {
   currentImageIndex.value = 0
 })
 
 const fetchComments = async () => {
   try {
-    const result = await commentStore.fetchComments(props.item.id, {
+    await commentStore.fetchComments(detailItem.id, {
       page: 1,
       limit: 5,
       sort: commentSortOrder.value
@@ -770,7 +768,7 @@ const fetchComments = async () => {
       commentLikeStore.initCommentsLikeStates(latestComments)
     }
   } catch (error) {
-    console.error(`获取笔记[${props.item.id}]评论失败:`, error)
+    console.error(`获取笔记[${detailItem.id}]评论失败:`, error)
     if (error.message && !error.message.includes('401') && !error.message.includes('未授权')) {
       showMessage('获取评论失败，请稍后重试', 'error')
     }
@@ -796,13 +794,13 @@ const loadMoreComments = async () => {
 
   try {
     // 获取当前分页状态
-    const commentData = commentStore.getComments(props.item.id)
+    const commentData = commentStore.getComments(detailItem.id)
     const nextPage = (commentData.currentPage || 0) + 1
     const existingCommentIds = new Set(
       (commentData.comments || []).map(comment => comment.id)
     )
 
-    const updatedComments = await commentStore.fetchComments(props.item.id, {
+    const updatedComments = await commentStore.fetchComments(detailItem.id, {
       page: nextPage,
       limit: 5,
       loadMore: true,
@@ -966,12 +964,7 @@ const locateTargetComment = async () => {
         setTimeout(() => {
           commentElement.classList.remove('comment-highlight')
         }, 3000)
-
-      } else {
-
       }
-    } else {
-
     }
   } finally {
     // 定位完成后，在移动端解锁页面滚动
@@ -1010,11 +1003,11 @@ const isCurrentUserComment = (comment) => {
 
 // 判断评论者是否为帖子作者
 const isPostAuthorComment = (comment) => {
-  if (!comment || !props.item) {
+  if (!comment || !detailItem) {
     return false
   }
 
-  const postAuthorId = props.item.author_auto_id // 帖子作者的自增ID
+  const postAuthorId = detailItem.author_auto_id // 帖子作者的自增ID
   const commentUserId = comment.user_auto_id // 评论者的自增ID
 
   return postAuthorId && commentUserId && postAuthorId === commentUserId
@@ -1031,13 +1024,13 @@ const handleDeleteComment = async (comment) => {
     const response = await commentApi.deleteComment(comment.id)
 
     // 只有后端删除成功后，才更新前端状态
-    const currentComments = commentStore.getComments(props.item.id)
+    const currentComments = commentStore.getComments(detailItem.id)
     if (currentComments && currentComments.comments) {
       const updatedComments = currentComments.comments.filter(c => c.id !== comment.id)
 
       // 使用后端返回的删除数量来更新总数
       const deletedCount = response.data?.deletedCount || 1
-      commentStore.updateComments(props.item.id, {
+      commentStore.updateComments(detailItem.id, {
         comments: updatedComments,
         total: currentComments.total - deletedCount
       })
@@ -1061,7 +1054,7 @@ const handleDeleteReply = async (reply, commentId) => {
     const response = await commentApi.deleteComment(reply.id)
 
     // 只有后端删除成功后，才更新前端状态
-    const currentComments = commentStore.getComments(props.item.id)
+    const currentComments = commentStore.getComments(detailItem.id)
     if (currentComments && currentComments.comments) {
       const targetComment = currentComments.comments.find(c => c.id === commentId)
       if (targetComment) {
@@ -1069,7 +1062,7 @@ const handleDeleteReply = async (reply, commentId) => {
 
         // 使用后端返回的删除数量来更新总数
         const deletedCount = response.data?.deletedCount || 1
-        commentStore.updateComments(props.item.id, {
+        commentStore.updateComments(detailItem.id, {
           comments: currentComments.comments,
           total: currentComments.total - deletedCount
         })
@@ -1087,10 +1080,10 @@ const handleDeleteReply = async (reply, commentId) => {
 
 const closeModal = () => {
   if (isClosing.value) return // 防止重复触发
-  
+
   isClosing.value = true
   showContent.value = false // 立即隐藏内容
-  
+
   // 不再使用setTimeout，改为依赖动画结束事件触发关闭
 }
 
@@ -1106,7 +1099,7 @@ const handleUnfollow = (userId) => {
   emit('unfollow', userId)
 }
 
-const toggleLike = async (willBeLiked) => {
+const toggleLike = async () => {
   // 检查用户是否已登录
   if (!userStore.isLoggedIn) {
     authStore.openLoginModal()
@@ -1115,16 +1108,16 @@ const toggleLike = async (willBeLiked) => {
 
   try {
     // 获取当前状态
-    const currentState = likeStore.getPostLikeState(props.item.id)
+    const currentState = likeStore.getPostLikeState(detailItem.id)
     const currentLiked = currentState.liked
     const currentLikeCount = currentState.likeCount
 
     // 使用全局store的点赞方法，传递当前状态
-    await likeStore.togglePostLike(props.item.id, currentLiked, currentLikeCount)
+    await likeStore.togglePostLike(detailItem.id, currentLiked, currentLikeCount)
 
     // 触发点赞事件，传递笔记ID和新的点赞状态
     emit('like', {
-      postId: props.item.id,
+      postId: detailItem.id,
       liked: !currentLiked
     })
   } catch (error) {
@@ -1134,7 +1127,7 @@ const toggleLike = async (willBeLiked) => {
 }
 
 // 评论点赞处理
-const toggleCommentLike = async (comment, willBeLiked) => {
+const toggleCommentLike = async (comment) => {
   // 检查用户是否已登录
   if (!userStore.isLoggedIn) {
     authStore.openLoginModal()
@@ -1170,7 +1163,7 @@ const toggleCollect = async () => {
   }
 
   try {
-    const postId = props.item.id
+    const postId = detailItem.id
 
     // 从收藏状态管理器获取当前状态
     const currentState = collectStore.getPostCollectState(postId)
@@ -1202,7 +1195,7 @@ const toggleCollect = async () => {
 
 const handleShare = async () => {
   try {
-    const shareUrl = `【${props.item.title}-${props.item.author}| 小石榴 - 你的校园图文部落】${window.location.origin}/post?id=${props.item.id}`
+    const shareUrl = `【${detailItem.title}-${detailItem.author}| 小石榴 - 你的校园图文部落】${window.location.origin}/post?id=${detailItem.id}`
 
     // 检查是否支持现代剪贴板API
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1299,7 +1292,7 @@ const setCommentSort = async (order) => {
 
   // 重新获取评论数据，重置为第一页
   try {
-    await commentStore.fetchComments(props.item.id, {
+    await commentStore.fetchComments(detailItem.id, {
       page: 1,
       limit: 5,
       sort: order,
@@ -1453,14 +1446,6 @@ const removeUploadedImage = (index) => {
   // ImageUploadModal会通过watch监听props.modelValue的变化自动同步
 }
 
-// 输入框键盘事件处理
-const handleInputKeydown = (event) => {
-  if (event.key === 'Escape') {
-    // ESC键取消输入
-    event.preventDefault()
-    handleCancelInput()
-  }
-}
 // 开始回复评论
 const handleReplyComment = (target, parentId = null) => {
   // 如果是回复评论，parentId为null，target就是comment对象
@@ -1863,41 +1848,24 @@ const handleImageLoad = (event, index) => {
     // 只有第一张图片加载时才计算容器尺寸
     if (index === 0) {
       const img = event.target
-      const aspectRatio = img.naturalWidth / img.naturalHeight
       const container = img.closest('.mobile-image-container')
-      
+
       if (container) {
-        const screenWidth = window.innerWidth
         const maxHeight = 565 // 最大高度限制
         const minHeight = 200 // 最小高度限制
-        
+
         // 始终按宽度适配，高度按比例变化
         const containerWidth = window.innerWidth // 直接使用视口宽度
         const calculatedHeight = containerWidth * (img.naturalHeight / img.naturalWidth)
-        
-        let finalWidth = containerWidth
-        let finalHeight = calculatedHeight
-        let objectFit = 'contain' // 默认使用contain确保完整显示
-        
-        if (calculatedHeight > maxHeight) {
-          finalHeight = maxHeight
-          finalWidth = containerWidth // 容器宽度保持屏幕宽度
-          objectFit = 'contain'
-        } else if (calculatedHeight < minHeight) {
-          finalHeight = minHeight
-          finalWidth = containerWidth
-          objectFit = 'contain'
-        } else {
-          finalWidth = containerWidth
-          finalHeight = calculatedHeight
-          objectFit = 'contain'
-        }
-        
+
+        const finalHeight = Math.min(maxHeight, Math.max(minHeight, calculatedHeight))
+        const objectFit = 'contain'
+
         // 强制设置容器尺寸，覆盖CSS默认值
         container.style.width = '100vw' // 使用视口宽度确保占满屏幕
         container.style.height = finalHeight + 'px'
         container.style.minHeight = 'unset'
-        container.style.margin = '0 0 16px 0' 
+        container.style.margin = '0 0 16px 0'
         container.style.maxWidth = 'none'
         container.style.left = '0'
         container.style.position = 'relative'
@@ -2150,20 +2118,12 @@ const handleSendComment = async () => {
     return
   }
 
-  // 构建包含图片的评论内容
-  let contentToSend = sanitizedContent
-  if (uploadedImages.value.length > 0) {
-    const imageHtml = uploadedImages.value.map(img => `<img src="${img.url}" alt="评论图片" class="comment-image" />`).join('')
-    contentToSend = sanitizedContent.trim() ? `${sanitizedContent}${imageHtml}` : imageHtml
-  }
-
-
-
   // 立即反馈：折叠输入框
   isInputFocused.value = false
 
   // 保存当前输入内容和回复状态，用于失败时恢复和骨架屏显示
-  const savedInput = commentInput.value
+  // 失败恢复和最终提交都使用同一份净化结果，避免校验安全内容后又提交原始输入。
+  const savedInput = sanitizedContent
   const savedReplyingTo = replyingTo.value
   const savedUploadedImages = [...uploadedImages.value]
 
@@ -2191,7 +2151,7 @@ const handleSendComment = async () => {
     }
 
     const commentData = {
-      post_id: props.item.id,
+      post_id: detailItem.id,
       content: finalContent,
       parent_id: savedReplyingTo ? savedReplyingTo.commentId : null
     }
@@ -2256,22 +2216,22 @@ const handleSendComment = async () => {
             topLevelParent.replies.push(newComment)
             topLevelParent.reply_count = (topLevelParent.reply_count || 0) + 1
             // 更新commentStore中的数据以保持一致性
-            const commentData = commentStore.getComments(props.item.id)
-            commentStore.updateComments(props.item.id, {
+            const commentData = commentStore.getComments(detailItem.id)
+            commentStore.updateComments(detailItem.id, {
               ...commentData,
               total: (commentData.total || 0) + 1
             })
           } else {
             // 父评论不在当前页面中（可能在其他分页），只更新总数不重新加载
-            const commentData = commentStore.getComments(props.item.id)
-            commentStore.updateComments(props.item.id, {
+            const commentData = commentStore.getComments(detailItem.id)
+            commentStore.updateComments(detailItem.id, {
               ...commentData,
               total: (commentData.total || 0) + 1
             })
           }
         } else {
           // 如果是顶级评论，直接添加到评论列表
-          commentStore.addComment(props.item.id, newComment)
+          commentStore.addComment(detailItem.id, newComment)
         }
 
         // 使用setTimeout确保DOM完全更新后定位
@@ -2338,11 +2298,11 @@ const handleCancelInput = () => {
 const fetchPostDetail = async () => {
   try {
     // 使用经过transformPostData处理的getPostDetail函数
-    const postDetail = await getPostDetail(props.item.id)
+    const postDetail = await getPostDetail(detailItem.id)
 
     if (postDetail) {
-      // 更新props.item以包含完整的数据（包括author_auto_id）
-      Object.assign(props.item, postDetail)
+      // 只更新内部详情快照，不反向修改父组件传入的卡片对象。
+      Object.assign(detailItem, postDetail)
 
       likeStore.initPostLikeState(
         postDetail.id,
@@ -2375,17 +2335,17 @@ const fetchPostDetail = async () => {
       }
     }
   } catch (error) {
-    console.error(`❌ 获取笔记${props.item.id}详情失败:`, error)
+    console.error(`❌ 获取笔记${detailItem.id}详情失败:`, error)
     likeStore.initPostLikeState(
-      props.item.id,
-      props.item.liked || false,
-      props.item.likeCount || props.item.like_count || 0
+      detailItem.id,
+      detailItem.liked || false,
+      detailItem.likeCount || detailItem.like_count || 0
     )
 
     collectStore.initPostCollectState(
-      props.item.id,
-      props.item.collected || false,
-      props.item.collectCount || props.item.collect_count || 0
+      detailItem.id,
+      detailItem.collected || false,
+      detailItem.collectCount || detailItem.collect_count || 0
     )
   }
 }
@@ -2465,7 +2425,7 @@ onMounted(async () => {
   }
 
   // 检查是否已有评论数据（预加载场景）
-  const existingComments = commentStore.getComments(props.item.id)
+  const existingComments = commentStore.getComments(detailItem.id)
   const hasPreloadedComments = existingComments && existingComments.comments && existingComments.comments.length > 0
 
   if (!hasPreloadedComments) {
@@ -2481,7 +2441,7 @@ onMounted(async () => {
   }
 
   // 自动播放视频
-  if (props.item.type === 2 && props.item.video_url) {
+  if (detailItem.type === 2 && detailItem.video_url) {
     nextTick(() => {
       autoPlayVideo()
     })
@@ -2530,7 +2490,7 @@ const isTouching = ref(false) // 添加触摸状态标记
 const handleTouchStart = (e) => {
   // 确保只处理单指触摸
   if (e.touches.length !== 1) return
-  
+
   isTouching.value = true
   touchStartX.value = e.touches[0].clientX
   touchStartY.value = e.touches[0].clientY
@@ -2541,7 +2501,7 @@ const handleTouchStart = (e) => {
 const handleTouchMove = (e) => {
   // 如果不在触摸状态或多指触摸，直接返回
   if (!isTouching.value || e.touches.length !== 1) return
-  
+
   const touchMoveX = e.touches[0].clientX
   const touchMoveY = e.touches[0].clientY
 
@@ -2553,7 +2513,7 @@ const handleTouchMove = (e) => {
     e.preventDefault()
     e.stopPropagation()
   }
-  
+
   // 实时更新结束坐标
   touchEndX.value = touchMoveX
   touchEndY.value = touchMoveY
@@ -2562,7 +2522,7 @@ const handleTouchMove = (e) => {
 const handleTouchEnd = (e) => {
   // 如果不在触摸状态，直接返回
   if (!isTouching.value) return
-  
+
   // 使用changedTouches获取最终坐标
   if (e.changedTouches.length > 0) {
     touchEndX.value = e.changedTouches[0].clientX
@@ -2576,7 +2536,7 @@ const handleTouchEnd = (e) => {
   if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
     e.preventDefault()
     e.stopPropagation()
-    
+
     if (deltaX > 0) {
       prevImage()
     } else {
@@ -2586,7 +2546,7 @@ const handleTouchEnd = (e) => {
 
   // 重置触摸状态，但不立即重置坐标
   isTouching.value = false
-  
+
   // 延迟重置坐标，给浏览器更多时间处理事件
   setTimeout(() => {
     if (!isTouching.value) {
@@ -4115,7 +4075,7 @@ function handleAvatarError(event) {
   .image-section {
     display: none;
   }
-  
+
   /* 移动端隐藏桌面端的视频容器 */
   .video-container {
     display: none;

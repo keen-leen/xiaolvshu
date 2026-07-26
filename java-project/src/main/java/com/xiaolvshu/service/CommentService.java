@@ -223,11 +223,15 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
             throw new BusinessException("笔记不存在");
         }
 
-        // 如果是回复评论，验证父评论是否存在
+        // 如果是回复评论，验证父评论存在且属于同一篇笔记。
+        Comment parentComment = null;
         if (parentId != null) {
-            Comment parentComment = commentMapper.selectById(parentId);
+            parentComment = commentMapper.selectById(parentId);
             if (parentComment == null) {
                 throw new BusinessException("父评论不存在");
+            }
+            if (!postId.equals(parentComment.getPostId())) {
+                throw new BusinessException("父评论不属于当前笔记");
             }
         }
 
@@ -239,27 +243,23 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
         comment.setParentId(parentId);
         commentMapper.insert(comment);
 
-        // 更新笔记评论数
-        post.setCommentCount(post.getCommentCount() + 1);
-        postMapper.updateById(post);
+        // 单条 SQL 原子递增，避免并发评论基于同一个旧计数相互覆盖。
+        postMapper.adjustCommentCount(postId, 1);
 
         // 创建通知
         if (parentId != null) {
             // 回复评论，给被回复的评论作者发通知
-            Comment parentComment = commentMapper.selectById(parentId);
-            if (parentComment != null) {
-                Long parentUserId = parentComment.getUserId();
-                // 不给自己发通知
-                if (!parentUserId.equals(userId)) {
-                    Notification notification = new Notification();
-                    notification.setUserId(parentUserId);
-                    notification.setSenderId(userId);
-                    notification.setType(Notification.TYPE_REPLY_COMMENT);
-                    notification.setTitle("回复了你的评论");
-                    notification.setTargetId(postId);
-                    notification.setCommentId(comment.getId());
-                    notificationMapper.insert(notification);
-                }
+            Long parentUserId = parentComment.getUserId();
+            // 不给自己发通知
+            if (!parentUserId.equals(userId)) {
+                Notification notification = new Notification();
+                notification.setUserId(parentUserId);
+                notification.setSenderId(userId);
+                notification.setType(Notification.TYPE_REPLY_COMMENT);
+                notification.setTitle("回复了你的评论");
+                notification.setTargetId(postId);
+                notification.setCommentId(comment.getId());
+                notificationMapper.insert(notification);
             }
         } else {
             // 评论笔记，给笔记作者发通知
@@ -328,12 +328,8 @@ public class CommentService extends ServiceImpl<CommentMapper, Comment> {
         // 递归删除评论及其子评论，获取删除的评论总数
         int deletedCount = deleteCommentRecursive(commentId);
         
-        // 更新笔记评论数
-        Post post = postMapper.selectById(comment.getPostId());
-        if (post != null) {
-            post.setCommentCount(Math.max(0, post.getCommentCount() - deletedCount));
-            postMapper.updateById(post);
-        }
+        // 删除的子树可能包含多条评论，按实际删除数一次性原子扣减。
+        postMapper.adjustCommentCount(comment.getPostId(), -deletedCount);
     }
     
     /**

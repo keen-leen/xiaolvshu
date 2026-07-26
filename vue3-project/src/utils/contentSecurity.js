@@ -1,102 +1,130 @@
-/**
- * 内容安全过滤工具函数
- * 统一管理危险标签过滤，防止XSS攻击
- */
+import DOMPurify from 'dompurify'
+
+const SAFE_USER_ID_PATTERN = /^[A-Za-z0-9_]{1,50}$/
 
 /**
- * 内容安全过滤函数
- * 保留mention链接和<br>标签，移除其他危险标签
- * @param {string} content - 需要过滤的内容
- * @returns {string} - 过滤后的安全内容
+ * 进一步约束 DOMPurify 放行的 a 标签：只有结构完整的站内 mention 才保留为链接。
+ * mention 的跳转地址由点击处理器根据 data-user-id 重新构造，因此持久化内容无需保留 href。
  */
-export const sanitizeContent = (content) => {
+const normalizeMentionLinks = container => {
+  container.querySelectorAll('a').forEach(link => {
+    const userId = link.getAttribute('data-user-id') || ''
+    if (!link.classList.contains('mention-link') || !SAFE_USER_ID_PATTERN.test(userId)) {
+      link.replaceWith(document.createTextNode(link.textContent || ''))
+      return
+    }
+
+    const text = link.textContent || ''
+    Array.from(link.attributes).forEach(attribute => link.removeAttribute(attribute.name))
+    link.className = 'mention-link'
+    link.setAttribute('data-user-id', userId)
+    link.textContent = text
+  })
+}
+
+/**
+ * 编辑器会产生 div/p 换行。持久化前统一转换成 br，避免不同入口保存出不同 HTML 结构。
+ */
+const flattenTextBlocks = container => {
+  container.querySelectorAll('div, p').forEach(block => {
+    const fragment = document.createDocumentFragment()
+    while (block.firstChild) {
+      fragment.appendChild(block.firstChild)
+    }
+    fragment.appendChild(document.createElement('br'))
+    block.replaceWith(fragment)
+  })
+}
+
+const sanitizeMarkup = (content, allowImages) => {
   if (!content) return ''
 
-  // 保留mention链接和<br>标签，但移除其他危险标签
-  // 先保存mention链接
-  const mentionLinks = []
-  let processedContent = content.replace(/<a[^>]*class="mention-link"[^>]*>.*?<\/a>/g, (match) => {
-    const placeholder = `__MENTION_${mentionLinks.length}__`
-    mentionLinks.push(match)
-    return placeholder
+  const sanitized = DOMPurify.sanitize(String(content), {
+    ALLOWED_TAGS: allowImages ? ['a', 'br', 'div', 'p', 'img'] : ['a', 'br', 'div', 'p'],
+    ALLOWED_ATTR: allowImages
+      ? ['class', 'data-user-id', 'src', 'alt']
+      : ['class', 'data-user-id']
   })
+  const container = document.createElement('div')
+  container.innerHTML = sanitized
+  normalizeMentionLinks(container)
+  flattenTextBlocks(container)
 
-  // 将其他换行元素转换为<br>标签
-  processedContent = processedContent.replace(/<\/div><div[^>]*>/gi, '<br>')
-  processedContent = processedContent.replace(/<\/p><p[^>]*>/gi, '<br>')
-  processedContent = processedContent.replace(/<div[^>]*>/gi, '')
-  processedContent = processedContent.replace(/<\/div>/gi, '')
-  processedContent = processedContent.replace(/<p[^>]*>/gi, '')
-  processedContent = processedContent.replace(/<\/p>/gi, '')
+  if (allowImages) {
+    container.querySelectorAll('img').forEach(image => {
+      const source = image.getAttribute('src') || ''
+      try {
+        const url = new URL(source, window.location.origin)
+        if (!['http:', 'https:', 'blob:'].includes(url.protocol)) {
+          image.remove()
+        }
+      } catch {
+        image.remove()
+      }
+    })
+  }
 
-  // 移除其他HTML标签，但保留<br>标签
-  processedContent = processedContent.replace(/<(?!br\s*\/?)[^>]*>/gi, '').replace(/&nbsp;/g, ' ')
-
-  // 恢复mention链接
-  mentionLinks.forEach((link, index) => {
-    processedContent = processedContent.replace(`__MENTION_${index}__`, link)
-  })
-
-  // 清理多余的<br>标签
-  processedContent = processedContent.replace(/(<br\s*\/?\s*){2,}/gi, '<br>')
-
-  return processedContent.trim()
+  return container.innerHTML
+    .replace(/(?:<br>\s*){2,}/gi, '<br>')
+    .replace(/(?:<br>)+$/i, '')
+    .trim()
 }
 
 /**
- * 简单的文本内容过滤函数
- * 移除所有HTML标签，只保留纯文本
- * @param {string} content - 需要过滤的内容
- * @returns {string} - 过滤后的纯文本内容
+ * 用户可编辑内容的持久化净化：仅保留换行和合法的站内 mention。
  */
-export const sanitizeText = (content) => {
+export const sanitizeContent = content => sanitizeMarkup(content, false)
+
+/**
+ * 帖子展示净化：在 sanitizeContent 的规则上额外允许安全图片。
+ * ContentRenderer 必须先调用本函数，再进行图片提取和 v-html 渲染。
+ */
+export const sanitizeDisplayContent = content => sanitizeMarkup(content, true)
+
+/**
+ * 后台详情可能展示富文本，但仍必须移除脚本、事件属性和危险 URL。
+ */
+export const sanitizeRichHtml = content => {
   if (!content) return ''
-  return content.replace(/<[^>]*>/g, '')
+  return DOMPurify.sanitize(String(content), {
+    USE_PROFILES: { html: true }
+  })
 }
 
 /**
- * 验证内容是否包含危险标签
- * @param {string} content - 需要验证的内容
- * @returns {boolean} - 是否包含危险标签
+ * 验证码由后端返回 SVG 文本。SVG profile 保留绘图元素，同时明确禁止可执行或嵌套 HTML。
  */
-export const hasDangerousTags = (content) => {
+export const sanitizeSvg = content => {
+  if (!content) return ''
+  return DOMPurify.sanitize(String(content), {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    FORBID_TAGS: ['script', 'foreignObject'],
+    FORBID_ATTR: ['style']
+  })
+}
+
+/**
+ * 纯文本场景移除全部 HTML。
+ */
+export const sanitizeText = content => {
+  if (!content) return ''
+  const container = document.createElement('div')
+  container.innerHTML = DOMPurify.sanitize(String(content), { ALLOWED_TAGS: [] })
+  return container.textContent || ''
+}
+
+export const hasDangerousTags = content => {
   if (!content) return false
-
-  // 危险标签列表
-  const dangerousTags = [
-    'script', 'iframe', 'object', 'embed', 'form', 'input', 'button',
-    'link', 'meta', 'style', 'base', 'applet', 'frame', 'frameset'
-  ]
-
-  const tagRegex = new RegExp(`<\/?(?:${dangerousTags.join('|')})[^>]*>`, 'gi')
-  return tagRegex.test(content)
+  return /<\/?(?:script|iframe|object|embed|form|input|button|link|meta|style|base|applet|frame|frameset)\b/i
+    .test(content)
 }
 
-/**
- * 验证内容是否包含危险属性
- * @param {string} content - 需要验证的内容
- * @returns {boolean} - 是否包含危险属性
- */
-export const hasDangerousAttributes = (content) => {
+export const hasDangerousAttributes = content => {
   if (!content) return false
-
-  // 危险属性列表
-  const dangerousAttrs = [
-    'onclick', 'onload', 'onerror', 'onmouseover', 'onmouseout',
-    'onfocus', 'onblur', 'onchange', 'onsubmit', 'javascript:'
-  ]
-
-  return dangerousAttrs.some(attr =>
-    content.toLowerCase().includes(attr.toLowerCase())
-  )
+  return /\s(?:on[a-z]+|srcdoc)\s*=|javascript\s*:/i.test(content)
 }
 
-/**
- * 完整的内容安全检查和过滤
- * @param {string} content - 需要处理的内容
- * @returns {object} - 包含是否安全和过滤后内容的对象
- */
-export const securityCheck = (content) => {
+export const securityCheck = content => {
   if (!content) {
     return {
       isSafe: true,
@@ -106,23 +134,11 @@ export const securityCheck = (content) => {
   }
 
   const warnings = []
-
-  // 检查危险标签
-  if (hasDangerousTags(content)) {
-    warnings.push('检测到危险HTML标签')
-  }
-
-  // 检查危险属性
-  if (hasDangerousAttributes(content)) {
-    warnings.push('检测到危险HTML属性')
-  }
-
-  // 过滤内容
-  const sanitizedContent = sanitizeContent(content)
-
+  if (hasDangerousTags(content)) warnings.push('检测到危险HTML标签')
+  if (hasDangerousAttributes(content)) warnings.push('检测到危险HTML属性')
   return {
     isSafe: warnings.length === 0,
-    sanitizedContent,
+    sanitizedContent: sanitizeContent(content),
     warnings
   }
 }

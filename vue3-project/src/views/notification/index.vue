@@ -15,14 +15,13 @@ import BackToTopButton from '@/components/BackToTopButton.vue'
 import VerifiedBadge from '@/components/VerifiedBadge.vue'
 import { getCommentNotifications, getLikeNotifications, getFollowNotifications, getCollectionNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/api/notification.js'
 import { getPostDetail } from '@/api/posts.js'
-import { postApi, userApi, commentApi } from '@/api/index.js'
+import { postApi, commentApi } from '@/api/index.js'
 import { useUserStore } from '@/stores/user'
 import { useAuthStore } from '@/stores/auth'
 import { useFollowStore } from '@/stores/follow'
 import { useNotificationStore } from '@/stores/notification'
 import { useThemeStore } from '@/stores/theme'
 import { useCommentLikeStore } from '@/stores/commentLike'
-import { useCommentStore } from '@/stores/comment'
 import { formatTime } from '@/utils/timeFormat'
 import { sanitizeContent } from '@/utils/contentSecurity'
 import avatarPlaceholder from '@/assets/imgs/avatar.png'
@@ -32,7 +31,6 @@ import imagePlaceholder from '@/assets/imgs/未加载.png'
 // Store实例
 const userStore = useUserStore()
 const commentLikeStore = useCommentLikeStore()
-const commentStore = useCommentStore()
 const authStore = useAuthStore()
 const followStore = useFollowStore()
 const notificationStore = useNotificationStore()
@@ -298,7 +296,7 @@ async function loadFollowsData(isLoadMore = false) {
                   return { userId, followed: false, isMutual: false, buttonType: 'follow' }
                 }
               }
-            } catch (error) {
+            } catch {
               return { userId, followed: false, isMutual: false, buttonType: 'follow' }
             }
           })
@@ -586,8 +584,6 @@ const onImageClick = async (notification) => {
         // 如果是评论类型的通知，传递评论ID用于定位
         if ((notification.type === 4 || notification.type === 5) && notification.commentId) {
           targetCommentId.value = notification.commentId;
-          // 预加载评论数据
-          await prepareDetailCard(notification.commentId);
         } else {
           targetCommentId.value = null;
         }
@@ -700,9 +696,6 @@ const getUserHoverConfig = (userId) => {
   return {
     getUserInfo: async () => {
       const currentUser = getDataByTab().find(item => item.id === userId)
-
-      // 获取用户的autoId，优先使用数字ID来调用API以保持一致性
-      const userAutoId = currentUser?.autoId || userId
 
       // 获取真实的用户统计数据
       let userStats = {
@@ -1134,38 +1127,6 @@ const showToastMessage = (message, type = 'success') => {
   setTimeout(() => {
     showToast.value = false
   }, 3000)
-}
-
-// handleReplyInput函数已移除，其功能已封装在ContentEditableInput组件中
-
-// 处理键盘事件，实现mention链接整体删除
-const handleInputKeydown = (event) => {
-  if (event.key === 'Backspace') {
-    // 处理mention链接的整体删除
-    const selection = window.getSelection()
-    if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0)
-      const container = range.startContainer
-
-      // 检查光标是否在mention链接之后
-      if (container.nodeType === Node.TEXT_NODE && container.previousSibling) {
-        const prevElement = container.previousSibling
-        if (prevElement.nodeType === Node.ELEMENT_NODE &&
-          prevElement.tagName === 'A' &&
-          prevElement.classList.contains('mention-link')) {
-          // 如果光标在mention链接后的文本节点开始位置
-          if (range.startOffset === 0) {
-            event.preventDefault()
-            // 删除整个mention链接
-            prevElement.remove()
-            // 触发input事件更新数据
-            const inputEvent = new Event('input', { bubbles: true })
-            event.target.dispatchEvent(inputEvent)
-          }
-        }
-      }
-    }
-  }
 }
 
 // 设置回复输入框引用

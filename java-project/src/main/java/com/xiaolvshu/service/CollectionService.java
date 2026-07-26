@@ -13,7 +13,12 @@ import com.xiaolvshu.mapper.NotificationMapper;
 import com.xiaolvshu.mapper.PostMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 收藏服务
@@ -82,5 +87,89 @@ public class CollectionService extends ServiceImpl<CollectionMapper, Collection>
             
             return new CollectResponse(true);
         }
+    }
+
+    /**
+     * 后台创建收藏。
+     *
+     * <p>后台接口不能直接调用通用 save，否则收藏关系已经存在而笔记统计仍保持旧值。
+     * 该方法把关系写入和计数更新纳入同一事务，数据库唯一索引负责处理并发重复创建。</p>
+     */
+    @Transactional
+    public Collection createForAdmin(Long userId, Long postId) {
+        Collection collection = new Collection();
+        collection.setUserId(userId);
+        collection.setPostId(postId);
+        try {
+            this.save(collection);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessException("已经收藏过该笔记");
+        }
+        postMapper.adjustCollectCount(postId, 1);
+        return collection;
+    }
+
+    /**
+     * 后台修改收藏关联的笔记，同时迁移两篇笔记的收藏计数。
+     */
+    @Transactional
+    public void updatePostForAdmin(Long collectionId, Long newPostId) {
+        Collection existing = this.getById(collectionId);
+        if (existing == null) {
+            throw new BusinessException("收藏不存在");
+        }
+        Long oldPostId = existing.getPostId();
+        if (oldPostId.equals(newPostId)) {
+            return;
+        }
+
+        existing.setPostId(newPostId);
+        try {
+            this.updateById(existing);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessException("已经收藏过该笔记");
+        }
+        postMapper.adjustCollectCount(oldPostId, -1);
+        postMapper.adjustCollectCount(newPostId, 1);
+    }
+
+    /**
+     * 后台删除单条收藏并同步扣减统计。
+     *
+     * @return 收藏存在且删除成功时返回 true
+     */
+    @Transactional
+    public boolean deleteForAdmin(Long collectionId) {
+        Collection existing = this.getById(collectionId);
+        if (existing == null || !this.removeById(collectionId)) {
+            return false;
+        }
+        postMapper.adjustCollectCount(existing.getPostId(), -1);
+        return true;
+    }
+
+    /**
+     * 后台批量删除收藏。
+     *
+     * <p>先一次性读取真实存在的关系，再按笔记分组扣减。这样请求中包含不存在的 ID 时，
+     * 返回值与计数变化都以实际删除记录为准，而不是以传入 ID 数量为准。</p>
+     */
+    @Transactional
+    public int deleteBatchForAdmin(List<Long> collectionIds) {
+        List<Collection> existingCollections = this.listByIds(collectionIds);
+        if (existingCollections.isEmpty()) {
+            return 0;
+        }
+
+        List<Long> existingIds = existingCollections.stream().map(Collection::getId).toList();
+        if (!this.removeByIds(existingIds)) {
+            return 0;
+        }
+
+        Map<Long, Long> deletedCountByPost = existingCollections.stream()
+                .collect(Collectors.groupingBy(Collection::getPostId, Collectors.counting()));
+        deletedCountByPost.forEach((postId, count) ->
+                postMapper.adjustCollectCount(postId, -Math.toIntExact(count)));
+        return existingCollections.size();
     }
 }

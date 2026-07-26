@@ -1021,7 +1021,8 @@ const handleFormSubmit = async () => {
     })
 
     // 视频数据处理：只对包含视频相关字段的表单进行处理
-    const hasVideoFields = processedData.hasOwnProperty('video_url') || processedData.hasOwnProperty('video_upload')
+    const hasVideoFields = Object.prototype.hasOwnProperty.call(processedData, 'video_url')
+      || Object.prototype.hasOwnProperty.call(processedData, 'video_upload')
     
     if (hasVideoFields) {
       // 移除临时的video_upload对象，但保留video对象用于后端清理旧文件

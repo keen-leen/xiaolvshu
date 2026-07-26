@@ -8,7 +8,8 @@
         </button>
       </div>
       <div class="modal-body">
-        <div class="detail-content" v-html="content">
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div class="detail-content" v-html="safeContent">
         </div>
       </div>
     </div>
@@ -16,7 +17,9 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
+import { sanitizeRichHtml } from '@/utils/contentSecurity'
 
 const props = defineProps({
   visible: {
@@ -34,6 +37,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:visible', 'close'])
+const safeContent = computed(() => sanitizeRichHtml(props.content))
 
 const closeModal = () => {
   emit('update:visible', false)

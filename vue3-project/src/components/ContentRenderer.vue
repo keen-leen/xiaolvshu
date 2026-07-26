@@ -1,8 +1,10 @@
 <template>
   <div class="content-renderer">
     <!-- 文字内容 -->
-    <div v-if="text" class="content-text">
-      <span class="mention-text" v-html="parsedText" @click="handleMentionClick"></span>
+    <div v-if="renderedText" class="content-text">
+      <!-- 内容已由 sanitizeDisplayContent 按 mention 白名单净化。 -->
+      <!-- eslint-disable-next-line vue/no-v-html -->
+      <span class="mention-text" v-html="renderedText" @click="handleMentionClick"></span>
     </div>
 
     <!-- 图片内容 -->
@@ -19,6 +21,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { sanitizeDisplayContent } from '@/utils/contentSecurity'
 
 const props = defineProps({
   content: {
@@ -32,7 +35,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['image-click'])
+defineEmits(['image-click'])
 
 // 获取实际内容，优先使用content，其次使用text
 const actualContent = computed(() => {
@@ -43,58 +46,21 @@ const actualContent = computed(() => {
 const parsedContent = computed(() => {
   if (!actualContent.value) return { text: '', images: [] }
 
-  // 创建临时DOM元素来解析HTML
+  // 先按展示白名单净化，再创建 DOM 提取图片，禁止原始服务端内容直接进入 v-html。
   const tempDiv = document.createElement('div')
-  tempDiv.innerHTML = actualContent.value
+  tempDiv.innerHTML = sanitizeDisplayContent(actualContent.value)
 
   // 提取图片
   const imgElements = tempDiv.querySelectorAll('img')
   const images = Array.from(imgElements).map(img => img.src)
 
-  // 移除图片元素，获取文本（保留mention链接的HTML格式）
+  // 移除图片元素，剩余内容只包含安全换行与合法 mention。
   imgElements.forEach(img => img.remove())
-
-  // 保留mention链接的HTML格式，只处理其他标签
-  let htmlContent = tempDiv.innerHTML
-  
-  // 保护mention链接
-  const mentionLinkRegex = /<a[^>]*class="[^"]*mention-link[^"]*"[^>]*>.*?<\/a>/g
-  const mentionLinks = []
-  let linkIndex = 0
-  
-  // 提取并保护mention链接
-  htmlContent = htmlContent.replace(mentionLinkRegex, (match) => {
-    const placeholder = `__MENTION_LINK_${linkIndex}__`
-    mentionLinks[linkIndex] = match
-    linkIndex++
-    return placeholder
-  })
-  
-  // 处理其他HTML标签
-  htmlContent = htmlContent.replace(/<br\s*\/?>/gi, '\n')
-  htmlContent = htmlContent.replace(/<\/div><div>/gi, '\n')
-  htmlContent = htmlContent.replace(/<div>/gi, '')
-  htmlContent = htmlContent.replace(/<\/div>/gi, '')
-  htmlContent = htmlContent.replace(/<\/p><p>/gi, '\n')
-  htmlContent = htmlContent.replace(/<p>/gi, '')
-  htmlContent = htmlContent.replace(/<\/p>/gi, '')
-  
-  // 恢复mention链接
-  mentionLinks.forEach((link, index) => {
-    htmlContent = htmlContent.replace(`__MENTION_LINK_${index}__`, link)
-  })
-
-  return { text: htmlContent.trim(), images }
+  return { text: tempDiv.innerHTML.trim(), images }
 })
 
-const text = computed(() => parsedContent.value.text)
+const renderedText = computed(() => parsedContent.value.text)
 const images = computed(() => parsedContent.value.images)
-
-// 解析文本中的mention标记
-const parsedText = computed(() => {
-  // 由于text现在已经包含HTML格式的mention链接，直接返回
-  return text.value
-})
 
 // 处理mention链接点击事件
 const handleMentionClick = (event) => {

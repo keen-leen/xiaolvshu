@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScroll, useWindowSize } from '@vueuse/core'
 import { useNavigationStore } from '@/stores/navigation'
@@ -133,11 +133,6 @@ function onTabClick(tabName) {
       navigationStore.scrollToTop('smooth')
     }, 300) // 300ms 等待动画完成
   }
-}
-
-// 回到顶部
-function goTop() {
-  navigationStore.scrollToTop('smooth')
 }
 
 // 获取用户信息
@@ -314,7 +309,7 @@ onMounted(async () => {
 
 
     <div class="tab" ref="tabBarRef" v-if="userInfo.nickname">
-      <div v-for="item in tabs" class="tab-item" :class="{ active: activeTab === item.name }"
+      <div v-for="item in tabs" :key="item.name" class="tab-item" :class="{ active: activeTab === item.name }"
         @click="onTabClick(item.name)">
         {{ item.label }}
       </div>
@@ -322,7 +317,7 @@ onMounted(async () => {
     </div>
 
     <div class="fixedTab" :class="{ hidden: scrollY < 300 }" ref="fixedTabBarRef" v-if="userInfo.nickname">
-      <div v-for="item in tabs" class="tab-item" :class="{ active: activeTab === item.name }"
+      <div v-for="item in tabs" :key="item.name" class="tab-item" :class="{ active: activeTab === item.name }"
         @click="onTabClick(item.name)">
         {{ item.label }}
       </div>

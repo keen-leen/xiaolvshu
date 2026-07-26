@@ -2,7 +2,7 @@
   <div class="tag-selector">
 
     <div class="tag-input-container">
-      <input v-model="tagInput" @keydown.enter.prevent="addTag" @keydown.comma.prevent="addTag" @input="onTagInput"
+      <input v-model="tagInput" @keydown.enter.prevent="addTag" @keydown="handleTagKeydown" @input="onTagInput"
         class="tag-input" placeholder="输入标签名称，按回车添加" maxlength="8" 
         :disabled="isInputDisabled" 
         :class="{ 'input-disabled': isInputDisabled }" />
@@ -53,7 +53,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import request from '@/api/request.js'
 
@@ -156,6 +156,15 @@ const addTag = () => {
   const newTags = [...selectedTags.value, input]
   emit('update:modelValue', newTags)
   tagInput.value = ''
+}
+
+/**
+ * Vue 没有内置 comma 键盘修饰符；显式判断中英文逗号，避免无效监听静默失效。
+ */
+const handleTagKeydown = (event) => {
+  if (event.key !== ',' && event.key !== '，') return
+  event.preventDefault()
+  addTag()
 }
 
 const removeTag = (tagToRemove) => {

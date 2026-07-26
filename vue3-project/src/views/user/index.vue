@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick, watch, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScroll, useWindowSize } from '@vueuse/core'
 import { useNavigationStore } from '@/stores/navigation'
@@ -241,11 +241,6 @@ function onTabClick(tabName) {
   // router.push(...)
 }
 
-// 回到顶部
-function goTop() {
-  navigationStore.scrollToTop('smooth')
-}
-
 // 跳转到关注/粉丝页面
 function goToFollowList(type) {
   router.push({
@@ -363,7 +358,7 @@ function handleCollect(data) {
 
     <div class="tab" ref="tabBarRef" v-if="userStore.isLoggedIn">
 
-      <div v-for="item in tabs" class="tab-item" :class="{ active: activeTab === item.name }"
+      <div v-for="item in tabs" :key="item.name" class="tab-item" :class="{ active: activeTab === item.name }"
         @click="onTabClick(item.name)">
         {{ item.label }}</div>
       <div class="tab-slider" :style="sliderStyle"></div>
@@ -371,7 +366,7 @@ function handleCollect(data) {
 
     <div class="fixedTab" :class="{ hidden: scrollY < 300 }" ref="fixedTabBarRef" v-if="userStore.isLoggedIn">
 
-      <div v-for="item in tabs" class="tab-item" :class="{ active: activeTab === item.name }"
+      <div v-for="item in tabs" :key="item.name" class="tab-item" :class="{ active: activeTab === item.name }"
         @click="onTabClick(item.name)">
         {{ item.label }}</div>
       <div class="tab-slider" :style="fixedSliderStyle"></div>

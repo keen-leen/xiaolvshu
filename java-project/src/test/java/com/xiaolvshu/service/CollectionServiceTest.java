@@ -66,4 +66,59 @@ class CollectionServiceTest {
         assertEquals(30L, notification.getUserId());
         assertEquals(UserContext.getUserId(), notification.getSenderId());
     }
+
+    @Test
+    void shouldCreateAdminCollectionAndAdjustCountInSameServicePath() {
+        PostMapper postMapper = mock(PostMapper.class);
+        CollectionService service = spy(new CollectionService(postMapper, mock(NotificationMapper.class)));
+        doReturn(true).when(service).save(any(Collection.class));
+
+        Collection created = service.createForAdmin(10L, 20L);
+
+        assertEquals(10L, created.getUserId());
+        assertEquals(20L, created.getPostId());
+        verify(service).save(any(Collection.class));
+        verify(postMapper).adjustCollectCount(20L, 1);
+    }
+
+    @Test
+    void shouldMoveAdminCollectionCountBetweenPosts() {
+        PostMapper postMapper = mock(PostMapper.class);
+        CollectionService service = spy(new CollectionService(postMapper, mock(NotificationMapper.class)));
+        Collection existing = new Collection();
+        existing.setId(1L);
+        existing.setUserId(10L);
+        existing.setPostId(20L);
+        doReturn(existing).when(service).getById(1L);
+        doReturn(true).when(service).updateById(any(Collection.class));
+
+        service.updatePostForAdmin(1L, 30L);
+
+        verify(postMapper).adjustCollectCount(20L, -1);
+        verify(postMapper).adjustCollectCount(30L, 1);
+    }
+
+    @Test
+    void shouldBatchDeleteOnlyExistingCollectionsAndGroupCountChanges() {
+        PostMapper postMapper = mock(PostMapper.class);
+        CollectionService service = spy(new CollectionService(postMapper, mock(NotificationMapper.class)));
+        Collection first = collection(1L, 20L);
+        Collection second = collection(2L, 20L);
+        Collection third = collection(3L, 30L);
+        doReturn(List.of(first, second, third)).when(service).listByIds(List.of(1L, 2L, 3L, 99L));
+        doReturn(true).when(service).removeByIds(List.of(1L, 2L, 3L));
+
+        int deleted = service.deleteBatchForAdmin(List.of(1L, 2L, 3L, 99L));
+
+        assertEquals(3, deleted);
+        verify(postMapper).adjustCollectCount(20L, -2);
+        verify(postMapper).adjustCollectCount(30L, -1);
+    }
+
+    private static Collection collection(Long id, Long postId) {
+        Collection collection = new Collection();
+        collection.setId(id);
+        collection.setPostId(postId);
+        return collection;
+    }
 }

@@ -29,19 +29,19 @@ public class AdminNotificationController {
     @GetMapping
     public AdminResult<?> getNotificationList(AdminNotificationQueryDTO queryDTO) {
         Page<Notification> pageParam = new Page<>(queryDTO.getPage(), queryDTO.getLimit());
-        
+
         LambdaQueryWrapper<Notification> wrapper = new LambdaQueryWrapper<>();
-        
+
         // 通知类型搜索
         if (queryDTO.getType() != null) {
             wrapper.eq(Notification::getType, queryDTO.getType());
         }
-        
+
         // 是否已读搜索
         if (queryDTO.getIsRead() != null) {
             wrapper.eq(Notification::getIsRead, queryDTO.getIsRead());
         }
-        
+
         // 用户显示ID搜索
         if (queryDTO.getUserDisplayId() != null && !queryDTO.getUserDisplayId().trim().isEmpty()) {
             LambdaQueryWrapper<User> userWrapper = new LambdaQueryWrapper<>();
@@ -53,7 +53,7 @@ public class AdminNotificationController {
             List<Long> userIds = users.stream().map(User::getId).collect(Collectors.toList());
             wrapper.in(Notification::getUserId, userIds);
         }
-        
+
         // 排序
         List<String> allowedSortFields = Arrays.asList("id", "created_at");
         if (queryDTO.getSortField() != null && allowedSortFields.contains(queryDTO.getSortField())) {
@@ -69,12 +69,33 @@ public class AdminNotificationController {
         } else {
             wrapper.orderByDesc(Notification::getCreatedAt);
         }
-        
+
         IPage<Notification> result = notificationService.page(pageParam, wrapper);
-        
-        // 转换为DTO
-        List<AdminNotificationDTO> notificationDTOs = new ArrayList<>();
-        for (Notification notification : result.getRecords()) {
+
+        List<AdminNotificationDTO> notificationDTOs = convertToDTOs(result.getRecords());
+
+        return AdminResult.success(notificationDTOs, result.getTotal(), queryDTO.getPage(), queryDTO.getLimit());
+    }
+
+    /**
+     * 接收者和发送者共用一次批量用户查询，避免每条通知触发两次数据库访问。
+     */
+    List<AdminNotificationDTO> convertToDTOs(List<Notification> notifications) {
+        if (notifications.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> userIds = notifications.stream()
+                .flatMap(notification -> java.util.stream.Stream.of(
+                        notification.getUserId(),
+                        notification.getSenderId()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, User> userMap = userService.listByIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
+
+        List<AdminNotificationDTO> notificationDTOs = new ArrayList<>(notifications.size());
+        for (Notification notification : notifications) {
             AdminNotificationDTO dto = new AdminNotificationDTO();
             dto.setId(notification.getId());
             dto.setUserId(notification.getUserId());
@@ -85,27 +106,25 @@ public class AdminNotificationController {
             dto.setCommentId(notification.getCommentId());
             dto.setIsRead(notification.getIsRead());
             dto.setCreatedAt(notification.getCreatedAt());
-            
-            // 获取接收用户信息
-            User user = userService.getById(notification.getUserId());
+
+            User user = userMap.get(notification.getUserId());
             if (user != null) {
                 dto.setUserNickname(user.getNickname());
                 dto.setUserDisplayId(user.getUserId() != null ? user.getUserId() : "user" + String.format("%03d", user.getId()));
             }
-            
+
             // 获取发送用户信息
             if (notification.getSenderId() != null) {
-                User sender = userService.getById(notification.getSenderId());
+                User sender = userMap.get(notification.getSenderId());
                 if (sender != null) {
                     dto.setSenderNickname(sender.getNickname());
                     dto.setSenderDisplayId(sender.getUserId() != null ? sender.getUserId() : "user" + String.format("%03d", sender.getId()));
                 }
             }
-            
+
             notificationDTOs.add(dto);
         }
-        
-        return AdminResult.success(notificationDTOs, result.getTotal(), queryDTO.getPage(), queryDTO.getLimit());
+        return notificationDTOs;
     }
 
     /**
@@ -138,21 +157,21 @@ public class AdminNotificationController {
         if (notification.getTitle() == null || notification.getTitle().trim().isEmpty()) {
             return AdminResult.badRequest("缺少必填字段: title");
         }
-        
+
         // 检查用户是否存在
         User user = userService.getById(notification.getUserId());
         if (user == null) {
             return AdminResult.badRequest("接收用户不存在");
         }
-        
+
         User sender = userService.getById(notification.getSenderId());
         if (sender == null) {
             return AdminResult.badRequest("发送用户不存在");
         }
-        
+
         notification.setIsRead(0);
         notificationService.save(notification);
-        
+
         return AdminResult.success("通知创建成功", Map.of("id", notification.getId()));
     }
 
@@ -165,7 +184,7 @@ public class AdminNotificationController {
         if (existingNotification == null) {
             return AdminResult.notFound("通知不存在");
         }
-        
+
         if (notification.getUserId() != null) existingNotification.setUserId(notification.getUserId());
         if (notification.getSenderId() != null) existingNotification.setSenderId(notification.getSenderId());
         if (notification.getType() != null) existingNotification.setType(notification.getType());
@@ -173,7 +192,7 @@ public class AdminNotificationController {
         if (notification.getTargetId() != null) existingNotification.setTargetId(notification.getTargetId());
         if (notification.getCommentId() != null) existingNotification.setCommentId(notification.getCommentId());
         if (notification.getIsRead() != null) existingNotification.setIsRead(notification.getIsRead());
-        
+
         notificationService.updateById(existingNotification);
         return AdminResult.success("通知更新成功");
     }
@@ -187,7 +206,7 @@ public class AdminNotificationController {
         if (notification == null) {
             return AdminResult.notFound("通知不存在");
         }
-        
+
         notificationService.removeById(id);
         return AdminResult.success("通知删除成功");
     }
@@ -200,7 +219,7 @@ public class AdminNotificationController {
         if (deleteDTO.getIds() == null || deleteDTO.getIds().isEmpty()) {
             return AdminResult.badRequest("缺少必填字段: ids");
         }
-        
+
         int deletedCount = notificationService.removeByIds(deleteDTO.getIds()) ? deleteDTO.getIds().size() : 0;
         return AdminResult.success("成功删除" + deletedCount + "条通知", Map.of("deletedCount", deletedCount));
     }

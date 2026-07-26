@@ -8,8 +8,8 @@ import com.xiaolvshu.dto.admin.AdminUserQueryDTO;
 import com.xiaolvshu.dto.admin.BatchDeleteDTO;
 import com.xiaolvshu.entity.User;
 import com.xiaolvshu.service.UserService;
-import com.xiaolvshu.utils.PasswordUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
@@ -25,6 +25,7 @@ import java.util.Map;
 public class AdminUserController {
 
     private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 分页查询用户列表
@@ -107,11 +108,12 @@ public class AdminUserController {
             return AdminResult.conflict("user_id已存在");
         }
 
-        // 设置默认密码 (123456的SHA256哈希值)
+        // 普通用户登录同样使用 PasswordEncoder.matches；后台创建路径必须写入 BCrypt，
+        // 不能再生成与运行时认证协议不兼容的 SHA-256 值。
         if (user.getPassword() == null || user.getPassword().trim().isEmpty()) {
-            user.setPassword(PasswordUtil.sha256("123456"));
+            user.setPassword(passwordEncoder.encode("123456"));
         } else {
-            user.setPassword(PasswordUtil.sha256(user.getPassword()));
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
 
         // 设置默认值

@@ -6,8 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xiaolvshu.dto.admin.*;
 import com.xiaolvshu.entity.Admin;
 import com.xiaolvshu.service.AdminService;
-import com.xiaolvshu.utils.PasswordUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -21,6 +21,7 @@ import java.util.*;
 public class AdminAdminController {
 
     private final AdminService adminService;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 分页查询管理员列表
@@ -96,8 +97,9 @@ public class AdminAdminController {
         }
         
         admin.setUsername(admin.getUsername().trim());
-        // 对密码进行哈希加密
-        admin.setPassword(PasswordUtil.sha256(admin.getPassword()));
+        // 登录入口统一通过 PasswordEncoder.matches 校验。这里必须使用同一个 BCrypt Bean，
+        // 否则后台新建的 SHA-256 管理员会在保存成功后永远无法登录。
+        admin.setPassword(passwordEncoder.encode(admin.getPassword()));
         
         adminService.save(admin);
         return AdminResult.success("管理员创建成功", Map.of("id", admin.getId()));
@@ -113,9 +115,9 @@ public class AdminAdminController {
             return AdminResult.notFound("管理员不存在");
         }
         
-        // 如果更新密码，进行哈希加密
+        // 修改密码与首次建库、管理员登录保持同一 BCrypt cost=12 契约。
         if (admin.getPassword() != null && !admin.getPassword().trim().isEmpty()) {
-            existingAdmin.setPassword(PasswordUtil.sha256(admin.getPassword()));
+            existingAdmin.setPassword(passwordEncoder.encode(admin.getPassword()));
         }
         
         adminService.updateById(existingAdmin);

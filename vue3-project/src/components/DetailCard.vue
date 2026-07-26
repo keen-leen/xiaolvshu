@@ -959,14 +959,28 @@ const loadMoreComments = async () => {
     // 获取当前分页状态
     const commentData = commentStore.getComments(props.item.id)
     const nextPage = (commentData.currentPage || 0) + 1
+    const existingCommentIds = new Set(
+      (commentData.comments || []).map(comment => comment.id)
+    )
 
-    await commentStore.fetchComments(props.item.id, {
+    const updatedComments = await commentStore.fetchComments(props.item.id, {
       page: nextPage,
       limit: 5,
       loadMore: true,
       silentLoad: true,
       sort: commentSortOrder.value
     })
+
+    // 评论正文与点赞状态分别存放在 commentStore 和 commentLikeStore 中。
+    // 首屏加载会同步点赞 store；分页加载也必须同步本次新增评论，否则渲染层会读取默认的
+    // “未点赞、0”并覆盖接口返回值。这里只初始化新增评论（批量方法会递归处理其回复），
+    // 避免旧分页的接口快照覆盖用户在当前页面刚完成的乐观点赞结果。
+    const newlyLoadedComments = Array.isArray(updatedComments)
+      ? updatedComments.filter(comment => !existingCommentIds.has(comment.id))
+      : []
+    if (newlyLoadedComments.length > 0) {
+      commentLikeStore.initCommentsLikeStates(newlyLoadedComments)
+    }
 
     // 加载后：DOM 更新完成后，恢复滚动位置
     nextTick(() => {

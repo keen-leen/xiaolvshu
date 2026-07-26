@@ -3,6 +3,24 @@ import request from './request.js'
 import apiConfig from '@/config/api.js'
 import { hasViewedPost, markPostAsViewed } from '@/utils/viewTracker.js'
 
+// 后端统一使用 Jackson SNAKE_CASE，因此嵌套的图片归属 DTO 也会输出 snake_case。
+// 在 API 边界一次性转为前端 camelCase，避免组件分别兼容两套字段名；即使某个位置
+// 缺少归属对象也保留数组下标，确保多图轮播不会把后一张图片的摄影师错配给前一张。
+function transformImageAttribution(attribution) {
+  const source = attribution || {}
+  return {
+    imageUrl: source.image_url,
+    provider: source.provider,
+    providerAssetId: source.provider_asset_id,
+    photographer: source.photographer,
+    photographerUrl: source.photographer_url,
+    sourceUrl: source.source_url,
+    licenseName: source.license_name,
+    licenseUrl: source.license_url,
+    altText: source.alt_text
+  }
+}
+
 // 转换后端数据格式为前端瀑布流需要的格式
 function transformPostData(backendPost) {
 
@@ -12,6 +30,7 @@ function transformPostData(backendPost) {
 
   const collectCount = backendPost.collect_count || 0
   const commentCount = backendPost.comment_count || 0
+  const imageAttributions = (backendPost.image_attributions || []).map(transformImageAttribution)
 
   const transformedData = {
     id: backendPost.id,
@@ -19,7 +38,7 @@ function transformPostData(backendPost) {
     title: backendPost.title,
     content: backendPost.content,
     images: backendPost.images || [],
-    imageAttributions: backendPost.image_attributions || [],
+    imageAttributions,
     // 视频相关字段
     video_url: backendPost.video_url,
     cover_url: backendPost.cover_url,
@@ -54,7 +73,7 @@ function transformPostData(backendPost) {
     originalData: {
       content: backendPost.content,
       images: backendPost.images || [],
-      imageAttributions: backendPost.image_attributions || [],
+      imageAttributions,
       tags: backendPost.tags || [],
       createdAt: backendPost.created_at,
       userId: backendPost.user_id

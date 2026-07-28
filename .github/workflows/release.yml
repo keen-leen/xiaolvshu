@@ -1,0 +1,162 @@
+name: Build, publish and deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_scope:
+        description: 本次需要构建和更新的应用
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Require main branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main releases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "生产发布只能从 main 分支手动运行。" >&2
+            exit 1
+          fi
+
+  ci:
+    name: Run CI for release commit
+    needs: authorize
+    uses: ./.github/workflows/ci.yml
+    with:
+      checkout_ref: ${{ github.sha }}
+
+  resolve:
+    name: Resolve immutable release
+    needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      commit_sha: ${{ steps.release.outputs.commit_sha }}
+      image_tag: ${{ steps.release.outputs.image_tag }}
+      components: ${{ steps.release.outputs.components }}
+      backend_image_tag: ${{ steps.release.outputs.backend_image_tag }}
+      frontend_image_tag: ${{ steps.release.outputs.frontend_image_tag }}
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Resolve image tags and build matrix
+        id: release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          commit_sha="$(git rev-parse HEAD)"
+          image_tag="sha-${commit_sha:0:12}"
+
+          case "${{ inputs.release_scope }}" in
+            all)
+              components='[
+                {"image":"xiaolvshu-backend","context":"java-project","dockerfile":"java-project/Dockerfile"},
+                {"image":"xiaolvshu-frontend","context":"vue3-project","dockerfile":"vue3-project/Dockerfile"}
+              ]'
+              backend_image_tag="${image_tag}"
+              frontend_image_tag="${image_tag}"
+              ;;
+            backend)
+              components='[
+                {"image":"xiaolvshu-backend","context":"java-project","dockerfile":"java-project/Dockerfile"}
+              ]'
+              backend_image_tag="${image_tag}"
+              frontend_image_tag="keep"
+              ;;
+            frontend)
+              components='[
+                {"image":"xiaolvshu-frontend","context":"vue3-project","dockerfile":"vue3-project/Dockerfile"}
+              ]'
+              backend_image_tag="keep"
+              frontend_image_tag="${image_tag}"
+              ;;
+            *)
+              echo "不支持的发布范围: ${{ inputs.release_scope }}" >&2
+              exit 2
+              ;;
+          esac
+
+          echo "commit_sha=${commit_sha}" >> "${GITHUB_OUTPUT}"
+          echo "image_tag=${image_tag}" >> "${GITHUB_OUTPUT}"
+          echo "components=$(jq -c <<< "${components}")" >> "${GITHUB_OUTPUT}"
+          echo "backend_image_tag=${backend_image_tag}" >> "${GITHUB_OUTPUT}"
+          echo "frontend_image_tag=${frontend_image_tag}" >> "${GITHUB_OUTPUT}"
+
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: resolve
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve.outputs.components) }}
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.commit_sha }}
+
+      - name: Validate TCR configuration
+        shell: bash
+        env:
+          TCR_REGISTRY: ${{ vars.TCR_REGISTRY }}
+          TCR_NAMESPACE: ${{ vars.TCR_NAMESPACE }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+        run: |
+          set -Eeuo pipefail
+          test -n "${TCR_REGISTRY}"
+          test -n "${TCR_NAMESPACE}"
+          test -n "${TCR_USERNAME}"
+          test -n "${TCR_PASSWORD}"
+
+      - name: Log in to Tencent TCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ vars.TCR_REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and push immutable image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ vars.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/${{ matrix.image }}:${{ needs.resolve.outputs.image_tag }}
+            ${{ vars.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    name: Deploy selected components
+    needs: [resolve, publish]
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      deployment_ref: ${{ needs.resolve.outputs.commit_sha }}
+      backend_image_tag: ${{ needs.resolve.outputs.backend_image_tag }}
+      frontend_image_tag: ${{ needs.resolve.outputs.frontend_image_tag }}
+    secrets: inherit

@@ -1,0 +1,42 @@
+name: Roll back production
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_image_tag:
+        description: 后端目标 sha-* 标签，不回滚后端则填写 keep
+        required: true
+        default: keep
+        type: string
+      frontend_image_tag:
+        description: 前端目标 sha-* 标签，不回滚前端则填写 keep
+        required: true
+        default: keep
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    name: Require main branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main rollback
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "生产回滚只能从 main 分支手动运行。" >&2
+            exit 1
+          fi
+
+  deploy:
+    name: Roll back selected components
+    needs: authorize
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      deployment_ref: ${{ github.sha }}
+      backend_image_tag: ${{ inputs.backend_image_tag }}
+      frontend_image_tag: ${{ inputs.frontend_image_tag }}
+    secrets: inherit

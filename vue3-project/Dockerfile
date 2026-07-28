@@ -1,36 +1,32 @@
-# 多阶段构建：构建阶段
-FROM node:18-alpine AS build-stage
+# syntax=docker/dockerfile:1.7
 
-# 设置工作目录
+# Vite 7 要求 Node >= 20.19；与 CI 统一使用 Node 22，避免本地构建成功而镜像构建失败。
+FROM node:22-alpine AS build
+
 WORKDIR /app
 
-# 复制package.json和package-lock.json
-COPY package*.json ./
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
 
-# 安装依赖
-RUN npm ci
-
-# 复制源代码
 COPY . .
 
-# 构建应用
+# 线上统一使用同源 /api。浏览器不会直接感知后端容器地址，
+# 因而备案后在宿主机前置 HTTPS Nginx 时无需重新构建前端。
+ARG VITE_API_BASE_URL=/api
+ARG VITE_USE_REAL_API=false
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_USE_REAL_API=${VITE_USE_REAL_API}
+
 RUN npm run build
 
-# 生产阶段：使用nginx服务静态文件
-FROM nginx:alpine AS production-stage
+FROM nginx:1.29-alpine AS runtime
 
-# 复制构建产物到nginx目录
-COPY --from=build-stage /app/dist /usr/share/nginx/html
-
-# 复制nginx配置文件
+COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# 暴露端口
 EXPOSE 80
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=5 \
+    CMD wget --quiet --tries=1 --spider http://127.0.0.1/healthz || exit 1
 
-# 启动nginx
 CMD ["nginx", "-g", "daemon off;"]

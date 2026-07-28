@@ -107,6 +107,7 @@ npm run build
 ```text
 .
 ├── docker/dev/                  # 可复现的开发基础设施
+├── docker/prod/                 # TCR 单机生产编排与部署脚本
 ├── java-project/                # Spring Boot 后端
 ├── vue3-project/                # Vue 3 前端
 ├── doc/                         # 正式项目文档
@@ -119,3 +120,6 @@ npm run build
 - 需要密钥的配置必须同步补充到 `.env.example`，但不能写入真实值。
 - 数据库完整结构只维护在 `schema.sql`，初始化数据只维护在 `data.sql`。
 - 搜索映射变更应同步更新 [SEARCH_RAG.md](SEARCH_RAG.md) 和相应重建说明。
+
+线上构建、发布和服务器初始化流程见 [DEPLOYMENT.md](DEPLOYMENT.md)。生产服务器不从
+GitHub、Docker Hub 或 Elastic Registry 拉取内容，不能把本地开发 Compose 直接用于上线。

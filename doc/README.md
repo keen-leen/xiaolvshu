@@ -6,6 +6,7 @@
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)：系统边界、分层、组件关系和数据流。
 - [DEVELOPMENT.md](DEVELOPMENT.md)：本地配置、启动、构建和开发约定。
+- [DEPLOYMENT.md](DEPLOYMENT.md)：腾讯云 TCR、GitHub Actions、生产服务器初始化、发布与回滚。
 - [API.md](API.md)：接口地址、认证规则和端点索引。
 - [DATABASE.md](DATABASE.md)：MySQL 表结构、关系和搜索同步状态。
 - [CHANGE_LOG.md](CHANGE_LOG.md)：只记录影响整体架构或使用方式的重大变更。

@@ -4,6 +4,17 @@
 
 ## 2026-07
 
+### 增加腾讯云单机部署与 GitHub CI/CD
+
+- 增加面向 2 核 4G 腾讯云服务器的生产 Compose，并为后端、Elasticsearch、MySQL、
+  RabbitMQ、Redis 和前端设置明确的内存边界。
+- 前后端改用多阶段生产镜像，Elasticsearch SmartCN 插件在 CI 构建阶段预装；
+  服务器运行时所需镜像统一从腾讯云 TCR 拉取。
+- GitHub Actions 增加手动发布、固定提交部署、SSH 部署、健康检查、自动回滚和基础镜像
+  同步流程。
+- 宿主机 Nginx、Docker、Certbot 和首次证书签发保持人工初始化；证书续期由服务器自带
+  timer 完成，不向 CI/CD 暴露服务器 root 权限或证书私钥。
+
 ### 升级到 Spring Boot 4 与 Spring AI 2
 
 - 后端升级到 Spring Boot 4.1.0、Spring AI 2.0.0、MyBatis-Plus 3.5.17 和 Jackson 3。

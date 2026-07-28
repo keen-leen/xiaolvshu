@@ -1,0 +1,183 @@
+name: xiaolvshu-prod
+
+services:
+  mysql:
+    image: ${TCR_REGISTRY:?TCR_REGISTRY must be set}/${TCR_NAMESPACE:?TCR_NAMESPACE must be set}/mysql:8.0
+    restart: unless-stopped
+    mem_limit: 640m
+    cpus: 0.60
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
+      # schema.sql 以 xiaolvshu 为固定数据库名；这里禁止做成看似可配置但实际会漂移的开关。
+      MYSQL_DATABASE: xiaolvshu
+      MYSQL_USER: ${DB_USERNAME:-xiaolvshu}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      # 2 核 4G 单机的目标是给应用和 Elasticsearch 留出稳定余量，而不是追求数据库吞吐上限。
+      - --innodb-buffer-pool-size=256M
+      - --innodb-log-buffer-size=16M
+      - --max-connections=50
+      - --performance-schema=OFF
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 生产环境只初始化表结构。开发模拟数据绝不能随首次上线自动导入。
+      - ../dev/mysql/init/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      # 不只检查 mysqld 端口：必须等初始化脚本创建核心表后，后端才能开始连接。
+      test:
+        [
+          "CMD-SHELL",
+          "mysql -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" -e 'SELECT 1 FROM xiaolvshu.users LIMIT 1' >/dev/null"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    networks:
+      - backend
+
+  redis:
+    image: ${TCR_REGISTRY}/${TCR_NAMESPACE}/redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 160m
+    cpus: 0.15
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 96mb
+      # 会话、限流和登录状态不适合静默淘汰；达到上限时让写入显式失败，便于监控和扩容。
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - backend
+
+  rabbitmq:
+    image: ${TCR_REGISTRY}/${TCR_NAMESPACE}/rabbitmq:3-management
+    restart: unless-stopped
+    mem_limit: 384m
+    cpus: 0.25
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-xiaolvshu}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD must be set}
+      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: "0.45"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 8s
+      retries: 12
+      start_period: 45s
+    networks:
+      - backend
+
+  elasticsearch:
+    image: ${TCR_REGISTRY}/${TCR_NAMESPACE}/elasticsearch-smartcn:9.4.2
+    restart: unless-stopped
+    mem_limit: 1152m
+    cpus: 0.70
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      discovery.type: single-node
+      cluster.name: xiaolvshu-prod
+      node.name: xiaolvshu-prod-node
+      bootstrap.memory_lock: "true"
+      xpack.security.enabled: "true"
+      ELASTIC_PASSWORD: ${ELASTICSEARCH_PASSWORD:?ELASTICSEARCH_PASSWORD must be set}
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m -XX:ActiveProcessorCount=1"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u elastic:$$ELASTIC_PASSWORD http://127.0.0.1:9200/_cluster/health >/dev/null"
+        ]
+      interval: 15s
+      timeout: 8s
+      retries: 30
+      start_period: 90s
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - backend
+
+  backend:
+    image: ${TCR_REGISTRY}/${TCR_NAMESPACE}/xiaolvshu-backend:${BACKEND_IMAGE_TAG:?BACKEND_IMAGE_TAG must be set}
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 0.80
+    env_file:
+      - ${APP_ENV_FILE:-.env}
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:mysql://mysql:3306/xiaolvshu?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError"
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
+      AGENT_MAX_CONCURRENT: ${AGENT_MAX_CONCURRENT:-2}
+      AGENT_TRUST_FORWARDED_HEADERS: "true"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - backend
+
+  frontend:
+    image: ${TCR_REGISTRY}/${TCR_NAMESPACE}/xiaolvshu-frontend:${FRONTEND_IMAGE_TAG:?FRONTEND_IMAGE_TAG must be set}
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.15
+    ports:
+      # 始终只允许服务器本机访问；公网流量必须先经过宿主机 Nginx。首次验收可使用：
+      # ssh -L 18080:127.0.0.1:18080 <server>
+      - "127.0.0.1:${FRONTEND_PORT:-18080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  mysql_data:
+    name: xiaolvshu_prod_mysql_data
+  redis_data:
+    name: xiaolvshu_prod_redis_data
+  rabbitmq_data:
+    name: xiaolvshu_prod_rabbitmq_data
+  elasticsearch_data:
+    name: xiaolvshu_prod_elasticsearch_data
+
+networks:
+  backend:
+    name: xiaolvshu_prod_backend

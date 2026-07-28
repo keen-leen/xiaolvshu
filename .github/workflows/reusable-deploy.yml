@@ -1,0 +1,122 @@
+name: Reusable production deployment
+
+on:
+  workflow_call:
+    inputs:
+      deployment_ref:
+        description: 已通过 CI 的完整提交号；部署资产必须来自同一提交
+        required: true
+        type: string
+      backend_image_tag:
+        description: 后端 sha-* 镜像标签，keep 表示沿用当前版本
+        required: true
+        type: string
+      frontend_image_tag:
+        description: 前端 sha-* 镜像标签，keep 表示沿用当前版本
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy backend=${{ inputs.backend_image_tag }} frontend=${{ inputs.frontend_image_tag }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Validate deployment inputs
+        shell: bash
+        env:
+          BACKEND_IMAGE_TAG: ${{ inputs.backend_image_tag }}
+          FRONTEND_IMAGE_TAG: ${{ inputs.frontend_image_tag }}
+          PROD_HOST: ${{ vars.PROD_HOST }}
+          PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+          PROD_USER: ${{ vars.PROD_USER }}
+          PROD_DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
+          DEPLOYMENT_REF: ${{ inputs.deployment_ref }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_HOST_KEY: ${{ secrets.PROD_HOST_KEY }}
+        run: |
+          set -Eeuo pipefail
+          [[ "${DEPLOYMENT_REF}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${BACKEND_IMAGE_TAG}" == "keep" || "${BACKEND_IMAGE_TAG}" =~ ^sha-[0-9a-f]{12}$ ]]
+          [[ "${FRONTEND_IMAGE_TAG}" == "keep" || "${FRONTEND_IMAGE_TAG}" =~ ^sha-[0-9a-f]{12}$ ]]
+          if [[ "${BACKEND_IMAGE_TAG}" == "keep" && "${FRONTEND_IMAGE_TAG}" == "keep" ]]; then
+            echo "后端和前端不能同时使用 keep。" >&2
+            exit 2
+          fi
+          [[ "${PROD_SSH_PORT}" =~ ^[0-9]{1,5}$ ]]
+          [[ "${PROD_USER}" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "${PROD_DEPLOY_PATH}" =~ ^/opt/[A-Za-z0-9._/-]+$ ]]
+          test -n "${PROD_HOST}"
+          test -n "${PROD_SSH_KEY}"
+          test -n "${PROD_HOST_KEY}"
+
+      - name: Checkout deployment files
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.deployment_ref }}
+
+      - name: Configure pinned SSH host
+        shell: bash
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_HOST_KEY: ${{ secrets.PROD_HOST_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "${HOME}/.ssh"
+          printf '%s\n' "${PROD_SSH_KEY}" > "${HOME}/.ssh/id_ed25519"
+          printf '%s\n' "${PROD_HOST_KEY}" > "${HOME}/.ssh/known_hosts"
+          chmod 600 "${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/known_hosts"
+
+      - name: Package deployment files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tar -czf "${RUNNER_TEMP}/xiaolvshu-deploy.tar.gz" \
+            docker/prod \
+            docker/dev/mysql/init/schema.sql
+
+      - name: Upload deployment package
+        shell: bash
+        env:
+          PROD_HOST: ${{ vars.PROD_HOST }}
+          PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+          PROD_USER: ${{ vars.PROD_USER }}
+        run: |
+          set -Eeuo pipefail
+          scp -P "${PROD_SSH_PORT}" \
+            "${RUNNER_TEMP}/xiaolvshu-deploy.tar.gz" \
+            "${PROD_USER}@${PROD_HOST}:/tmp/xiaolvshu-deploy.tar.gz"
+
+      - name: Deploy and verify
+        shell: bash
+        env:
+          BACKEND_IMAGE_TAG: ${{ inputs.backend_image_tag }}
+          FRONTEND_IMAGE_TAG: ${{ inputs.frontend_image_tag }}
+          PROD_HOST: ${{ vars.PROD_HOST }}
+          PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+          PROD_USER: ${{ vars.PROD_USER }}
+          PROD_DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
+        run: |
+          set -Eeuo pipefail
+          ssh -p "${PROD_SSH_PORT}" "${PROD_USER}@${PROD_HOST}" \
+            bash -s -- \
+              "${PROD_DEPLOY_PATH}" \
+              "${BACKEND_IMAGE_TAG}" \
+              "${FRONTEND_IMAGE_TAG}" <<'REMOTE'
+          set -Eeuo pipefail
+          deploy_path="$1"
+          backend_image_tag="$2"
+          frontend_image_tag="$3"
+          install -d -m 750 "${deploy_path}"
+          tar -xzf /tmp/xiaolvshu-deploy.tar.gz -C "${deploy_path}"
+          rm -f /tmp/xiaolvshu-deploy.tar.gz
+          chmod 750 "${deploy_path}/docker/prod/scripts/"*.sh
+          exec "${deploy_path}/docker/prod/scripts/deploy.sh" \
+            "${backend_image_tag}" \
+            "${frontend_image_tag}"
+          REMOTE

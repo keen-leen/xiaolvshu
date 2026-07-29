@@ -76,7 +76,6 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-xiaolvshu}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD must be set}
-      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: "0.45"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:

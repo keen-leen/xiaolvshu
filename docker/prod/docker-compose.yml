@@ -125,7 +125,7 @@ services:
   backend:
     image: ${TCR_REGISTRY}/${TCR_NAMESPACE}/xiaolvshu-backend:${BACKEND_IMAGE_TAG:?BACKEND_IMAGE_TAG must be set}
     restart: unless-stopped
-    mem_limit: 768m
+    mem_limit: 1024m
     cpus: 0.80
     env_file:
       - ${APP_ENV_FILE:-.env}

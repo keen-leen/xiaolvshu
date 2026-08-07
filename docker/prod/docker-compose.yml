@@ -137,7 +137,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       ELASTICSEARCH_URIS: http://elasticsearch:9200
-      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError"
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError"
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
       API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
       AGENT_MAX_CONCURRENT: ${AGENT_MAX_CONCURRENT:-2}
